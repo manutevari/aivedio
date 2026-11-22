@@ -39,7 +39,7 @@ export default function App(){
  const selectedAudio=useMemo(()=>audioPlans.find(a=>a.id===audioId)??audioPlans[0],[audioPlans,audioId]);
  const latestQuality=useMemo(()=>{const m=new Map<string,Row>();for(const r of reports){if(r.asset_id&&!m.has(r.asset_id))m.set(r.asset_id,r)}return m},[reports]);
  const project=projects.find(p=>p.id===projectId);
- const optional=async<T>(path:string,fallback:T):Promise<T>=>{try{return await api<T>(path)}catch{return fallback}};
+ const optional=async<T,>(path:string,fallback:T):Promise<T>=>{try{return await api<T>(path)}catch{return fallback}};
  const loadProjects=useCallback(async()=>{const rows=await api<Project[]>("/v1/projects");setProjects(rows);return rows},[]);
  const refresh=useCallback(async()=>{
   try{
