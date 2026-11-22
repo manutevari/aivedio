@@ -19,6 +19,17 @@ import {listGenerationJobs,reviewGenerationJob,listProjectAssets,listProjectAsse
 import {parseReview} from "./validation.js";
 import {listEditDecisions,saveEditDecision,listSubtitles,upsertSubtitle,deleteSubtitle,getMixSettings,saveMixSetting} from "./editing.js";
 const app=Fastify({logger:true});
+app.post("/v1/projects/:id/production-cuts/:cutId/audio-plans",async(request,reply)=>{try{const p=request.params as {id:string;cutId:string};const b=request.body as {assetAssignments?:Record<string,string>;createdBy?:string};return reply.status(201).send(await createAudioPlan(p.id,p.cutId,b?.assetAssignments??{},b?.createdBy))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/audio-plans",async(request)=>listAudioPlans((request.params as {id:string}).id));
+app.get("/v1/projects/:id/audio-plans/:planId",async(request,reply)=>{const p=request.params as {id:string;planId:string};const r=await getAudioPlan(p.id,p.planId);if(!r)return reply.status(404).send({error:"Audio plan not found"});return r});
+app.patch("/v1/projects/:id/audio-plans/:planId/cues/:cueId",async(request,reply)=>{try{const p=request.params as {id:string;planId:string;cueId:string};return await updateAudioCue(p.id,p.planId,p.cueId,request.body as any)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/audio-plans/:planId/review",async(request,reply)=>{try{const p=request.params as {id:string;planId:string};const b=request.body as {decision:"approve"|"reject";reviewer:string;notes?:string};return await reviewAudioPlan(p.id,p.planId,b.decision,b.reviewer,b.notes)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/audio-plans/:planId/apply",async(request,reply)=>{try{const p=request.params as {id:string;planId:string};return await applyAudioPlan(p.id,p.planId)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/assets/:assetId/audio-analysis",async(request,reply)=>{try{const p=request.params as {id:string;assetId:string};return reply.status(202).send(await requestAudioAnalysis(p.id,p.assetId,(request.body as any)?.thresholds??{}))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/audio-analysis",async(request)=>{const p=request.params as {id:string};const q=request.query as {assetId?:string};return listAudioAnalysis(p.id,q.assetId)});
+app.get("/v1/projects/:id/audio-analysis/jobs",async(request)=>listAudioAnalysisJobs((request.params as {id:string}).id));
+app.get("/v1/projects/:id/audio-analysis/:reportId",async(request,reply)=>{const p=request.params as {id:string;reportId:string};const r=await getAudioAnalysis(p.id,p.reportId);if(!r)return reply.status(404).send({error:"Audio analysis report not found"});return r});
+app.put("/v1/projects/:id/audio-mix/:trackId/ducking",async(request,reply)=>{try{const p=request.params as {id:string;trackId:string};return await saveDucking(p.id,p.trackId,request.body as any)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.post("/v1/projects/:id/production-cuts",async(request,reply)=>{try{const p=request.params as {id:string};const b=request.body as {scriptPackageId:string;assetAssignments?:Record<string,string>;createdBy?:string};return reply.status(201).send(await createProductionCut(p.id,b))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/production-cuts",async(request)=>listProductionCuts((request.params as {id:string}).id));
 app.get("/v1/projects/:id/production-cuts/:cutId",async(request,reply)=>{const p=request.params as {id:string;cutId:string};const r=await getProductionCut(p.id,p.cutId);if(!r)return reply.status(404).send({error:"Production cut not found"});return r});
@@ -41,6 +52,7 @@ app.put("/v1/projects/:id/audio-mix",async(request,reply)=>{try{return reply.sta
 
 import {getTimeline,createTrack,updateTrack,createClip,updateClip,deleteClip,splitClip,trimClip,createRenderJob,listRenderJobs,getRenderJob,transitionRenderJob} from "./timeline.js";
 import {createProductionCut,listProductionCuts,getProductionCut,applyProductionCut,getTimelineEditManifest} from "./production-cuts.js";
+import {createAudioPlan,listAudioPlans,getAudioPlan,updateAudioCue,reviewAudioPlan,applyAudioPlan,requestAudioAnalysis,listAudioAnalysis,listAudioAnalysisJobs,getAudioAnalysis,saveDucking} from "./audio-intelligence.js";
 
 
 app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-6",database:pool?"configured":"not_configured"}));
