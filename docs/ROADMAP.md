@@ -137,3 +137,20 @@
 - [x] Post-render ffprobe QA: stream presence, duration, resolution and expected audio
 - [x] Human review gate before marking final delivery complete
 - [ ] Advanced transition implementation, sidechain ducking, subtitles styling, overlays/graphics, black/frozen-frame and audio loudness QA, download endpoint/object storage, authenticated review UI, integration tests
+
+## Phase 17 — Studio GUI & Flow Workspace
+- [x] Unified React Studio navigation across Overview, Plan, Script, Storyboard, Assets, Flow Library, Timeline, Audio, Quality & Safety, Renders and Generation Jobs
+- [x] Project selection and creation with creative brief
+- [x] Creative-plan versioning and approval
+- [x] Script package generation, validation display and human review
+- [x] Storyboard scene editing and persistence
+- [x] Asset quarantine review and analysis/technical-QA queue actions
+- [x] Project reference and character library views
+- [x] Production-cut compilation and apply gate
+- [x] Audio plan review, cue assignment/timing and apply gate
+- [x] Timeline track/clip overview and manifest validation action
+- [x] Render profile/subtitle settings, queue progress, QA and delivery review
+- [x] Generation job safety/quality status and approval/rejection
+- [x] Responsive styles for mobile widths
+- [x] Streamlit workspace extended to cover the same production pipeline
+- [ ] Interactive drag-and-drop timeline editing, actual media preview, upload UI, character CRUD forms, API authentication/role-based reviewer identity, complete endpoint validation and automated UI tests
