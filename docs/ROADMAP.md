@@ -164,7 +164,7 @@
 - [x] Harden render worker path resolution against symlink escape
 - [x] Recover expired/missing render leases
 - [x] Add GitHub Actions CI workflow (typecheck, build, Python syntax)
-- [ ] CI green and all type/build errors resolved
+- [x] CI green: typecheck, build, Python syntax and dependency dry-run
 - [ ] Secure user/session authentication and role-based review authorization
 - [ ] API ownership/authorization audit
 - [ ] E2E tests for project-to-delivery workflow
