@@ -63,3 +63,12 @@
 - [ ] Integrate composition planner into render worker
 - [ ] Subtitle burn-in, sidechain ducking, overlays and visual QA
 - [ ] End-to-end rendering tests and authenticated review
+
+## Phase 10 — Creative Director & Production Planning
+- [x] Creative brief/format contracts and deterministic story structure
+- [x] Duration-aware scene plans and shot breakdowns
+- [x] Camera, composition, lighting, emotional arc, music and continuity guidance
+- [x] Generation-ready scene and shot prompt drafts
+- [x] Plan validation and versioned persistence
+- [x] Plan list, fetch, update and approval API
+- [ ] Free-only LLM enrichment, reference-aware prompts, factual research/citations, Flow UI and continuity QA
