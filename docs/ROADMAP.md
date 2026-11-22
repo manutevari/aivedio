@@ -17,5 +17,12 @@
 - [ ] Embeddings/vector search, calibrated model-based intent, sentiment pipeline, HITL UI, tests
 ## Phase 4 — Flow Mode
 - Storyboard canvas; references; scene generation/edit/extend; variants; continuity and QA
-## Phase 5 — Media and production
-- MCP discovery/runtime; media workers; timeline; editing; rendering; export
+## Phase 5 — MCP capability and media-provider routing
+- [x] Capability contracts and request constraint matching
+- [x] Provider registry persistence
+- [x] Discovery candidate/trust separation
+- [x] Generation-job persistence and guarded state transitions
+- [x] Routing API contracts
+- [ ] Official MCP SDK runtime, real provider adapters, secure auth vault, worker execution, safety/QA pipelines
+## Phase 6 — Media worker and generation execution
+- Worker queue, provider adapters, asset ingestion, generation, QA, retry/repair
