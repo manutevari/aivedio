@@ -8,3 +8,4 @@ export * from "./intelligence.js";
 export * from "./flow-engine.js";
 export * from "./capabilities.js";
 export * from "./media.js";
+export * from "./timeline.js";
