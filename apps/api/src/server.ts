@@ -1,13 +1,24 @@
 import Fastify from "fastify";
 import { classifyNode, decideNextAction } from "@aivedio/core";
+import {pool,requireDb} from "./db.js";
+import {listProjects,createProject,getProject,updateProject,listScenes,createScene,updateScene,deleteScene} from "./projects.js";
+import {createRun,transitionRun,saveCheckpoint} from "./workflows.js";
 const app=Fastify({logger:true});
-app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-1"}));
-app.post("/v1/workflow/classify",async(request)=>{
- const body=request.body as {type:string;risk?:"low"|"medium"|"high"|"critical"};
- return classifyNode(body.type,body.risk??"low");
-});
-app.post("/v1/decision/evaluate",async(request)=>{
- return decideNextAction(request.body as Parameters<typeof decideNextAction>[0]);
-});
-const port=Number(process.env.PORT??3000);
-await app.listen({port,host:"0.0.0.0"});
+app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-2",database:pool?"configured":"not_configured"}));
+app.get("/ready",async(_r,reply)=>{try{if(!pool)return reply.status(503).send({ready:false,reason:"DATABASE_URL missing"});await pool.query("SELECT 1");return {ready:true};}catch{return reply.status(503).send({ready:false,reason:"database unavailable"});}});
+app.post("/v1/workflow/classify",async(request)=>{const body=request.body as {type:string;risk?:"low"|"medium"|"high"|"critical"};return classifyNode(body.type,body.risk??"low");});
+app.post("/v1/decision/evaluate",async(request)=>decideNextAction(request.body as Parameters<typeof decideNextAction>[0]));
+app.get("/v1/projects",async()=>listProjects());
+app.post("/v1/projects",async(request,reply)=>{const body=request.body as {title:string;mode?:string;target?:unknown;creativeBrief?:string};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});return reply.status(201).send(await createProject(body));});
+app.get("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await getProject(id);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
+app.patch("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await updateProject(id,request.body as Record<string,unknown>);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
+app.get("/v1/projects/:id/scenes",async(request)=>listScenes((request.params as {id:string}).id));
+app.post("/v1/projects/:id/scenes",async(request,reply)=>{const {id}=request.params as {id:string};if(!await getProject(id))return reply.status(404).send({error:"Project not found"});const body=request.body as {title:string;prompt?:string;durationSeconds?:number;sceneOrder?:number};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});return reply.status(201).send(await createScene(id,body));});
+app.patch("/v1/scenes/:id",async(request,reply)=>{const s=await updateScene((request.params as {id:string}).id,request.body as Record<string,unknown>);if(!s)return reply.status(404).send({error:"Scene not found"});return s;});
+app.delete("/v1/scenes/:id",async(request,reply)=>{if(!await deleteScene((request.params as {id:string}).id))return reply.status(404).send({error:"Scene not found"});return {deleted:true};});
+app.post("/v1/workflows",async(request,reply)=>{const body=request.body as {projectId?:string|null;name:string;graph:unknown};if(!body?.name||!body.graph)return reply.status(400).send({error:"name and graph required"});return reply.status(201).send(await createRun(body.projectId??null,body.name,body.graph));});
+app.post("/v1/workflows/:id/transition",async(request,reply)=>{try{return await transitionRun((request.params as {id:string}).id,(request.body as {status:string}).status as Parameters<typeof transitionRun>[1]);}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:"transition failed"});}});
+app.post("/v1/workflows/:id/checkpoints",async(request,reply)=>{const body=request.body as {nodeId:string;payload:unknown};if(!body?.nodeId)return reply.status(400).send({error:"nodeId required"});return reply.status(201).send(await saveCheckpoint((request.params as {id:string}).id,body.nodeId,body.payload??{}));});
+app.get("/v1/workflows/:id/events",async(request)=>{return (await requireDb().query("SELECT * FROM workflow_events WHERE run_id=$1 ORDER BY id",(request.params as {id:string}).id)).rows;});
+app.get("/v1/workflows/:id/checkpoints",async(request)=>{return (await requireDb().query("SELECT * FROM checkpoints WHERE run_id=$1 ORDER BY created_at DESC",(request.params as {id:string}).id)).rows;});
+const port=Number(process.env.PORT??3000);await app.listen({port,host:"0.0.0.0"});
