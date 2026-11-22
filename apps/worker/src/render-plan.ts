@@ -1,0 +1,11 @@
+import path from "node:path";
+import {spawn} from "node:child_process";
+import {RenderProfile,validateRenderProfile} from "@aivedio/core";
+export interface RenderInput{path:string;sourceStartMs:number;durationMs:number;timelineStartMs:number;volume?:number}
+export function resolveMediaPath(key:string,root=process.env.MEDIA_ROOT??"./media"){const base=path.resolve(root),target=path.resolve(base,key);if(!target.startsWith(base+path.sep))throw new Error("Media path escapes MEDIA_ROOT");return target}
+export function buildFfmpegArgs(inputs:RenderInput[],profile:RenderProfile,outputPath:string){const v=validateRenderProfile(profile);if(!v.valid)throw new Error(v.errors.join("; "));if(!inputs.length)throw new Error("At least one input clip is required");const args:string[]=[];for(const input of inputs){if(input.sourceStartMs<0||input.durationMs<=0||input.timelineStartMs<0)throw new Error("Invalid render input timing");args.push("-ss",(input.sourceStartMs/1000).toFixed(3),"-t",(input.durationMs/1000).toFixed(3),"-i",input.path)}
+ const chains=inputs.map((_,i)=>`[${i}:v]setpts=PTS-STARTPTS,scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2,fps=${profile.fps},format=yuv420p[v${i}]`).join(";");
+ const concat=inputs.map((_,i)=>`[v${i}]`).join("")+`concat=n=${inputs.length}:v=1:a=0[outv]`;
+ args.push("-filter_complex",chains+";"+concat,"-map","[outv]","-an","-c:v",profile.videoCodec==="h265"?"libx265":profile.videoCodec==="vp9"?"libvpx-vp9":"libx264");
+ args.push("-crf",profile.quality==="draft"?"28":profile.quality==="high"?"18":"23","-movflags","+faststart","-y",outputPath);return args}
+export function runFfmpeg(args:string,progress?:(line:string)=>void){return new Promise<void>((resolve,reject)=>{const child=spawn("ffmpeg",["-hide_banner","-nostdin","-progress","pipe:1",...JSON.parse(args) as string[]],{shell:false,stdio:["ignore","pipe","pipe"]});let stderr="";child.stdout.on("data",d=>progress?.(String(d)));child.stderr.on("data",d=>{stderr+=String(d).slice(-4000)});child.on("error",reject);child.on("close",code=>code===0?resolve():reject(new Error("FFmpeg exited "+code+": "+stderr)))});}
