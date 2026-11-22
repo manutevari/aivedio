@@ -1,0 +1,16 @@
+import {requireDb} from "./db.js";
+import {getTimeline} from "./timeline.js";
+import {defaultRenderProfile,RenderManifest,validateRenderManifest} from "@aivedio/core";
+export async function createRenderJobFromTimeline(projectId:string,profile:any=defaultRenderProfile,options:any={}){
+ const db=requireDb();const {tracks,clips}=await getTimeline(projectId);
+ const trackMap=new Map(tracks.map(t=>[t.id,t]));
+ const assets=await db.query("SELECT id,storage_key,mime_type,status FROM media_assets WHERE project_id=$1 AND id=ANY($2::uuid[])",[projectId,[...new Set(clips.map(c=>c.assetId).filter(Boolean))]]);
+ const assetMap=new Map(assets.rows.map(a=>[a.id,a]));
+ const videoClips=clips.filter(c=>["video","image"].includes(c.kind)&&trackMap.get(c.trackId)?.kind==="video").map(c=>{const a=c.assetId?assetMap.get(c.assetId):null;if(!a||a.status!=="ready")throw new Error("Visual clip asset is missing or not released: "+c.id);return{assetId:a.id,storageKey:a.storage_key,mimeType:a.mime_type,title:c.title,sourceStartMs:c.sourceStartMs,timelineStartMs:c.timelineStartMs,timelineDurationMs:c.timelineDurationMs,opacity:c.opacity,playbackRate:c.playbackRate,zIndex:c.zIndex,trackOrder:trackMap.get(c.trackId)!.order,transitionIn:c.transitionIn as any,transitionDurationMs:Number(c.metadata?.transitionInDurationMs??0)}});
+ const audioClips=clips.filter(c=>c.kind==="audio"&&["audio","music","sfx"].includes(trackMap.get(c.trackId)?.kind??"")).map(c=>{const a=c.assetId?assetMap.get(c.assetId):null;if(!a||a.status!=="ready")throw new Error("Audio clip asset is missing or not released: "+c.id);const t=trackMap.get(c.trackId)!;return{assetId:a.id,storageKey:a.storage_key,mimeType:a.mime_type,title:c.title,sourceStartMs:c.sourceStartMs,timelineStartMs:c.timelineStartMs,timelineDurationMs:c.timelineDurationMs,sourceDurationMs:c.sourceDurationMs,playbackRate:c.playbackRate,volume:c.volume,trackGainDb:t.gainDb,trackKind:t.kind==="music"?"music":t.kind==="sfx"?"sfx":"audio",trackOrder:t.order,muted:t.muted,ducking:(c.metadata?.ducking??undefined)}});
+ const subtitles=(await db.query("SELECT id,start_ms,end_ms,text,language,style FROM subtitle_cues WHERE project_id=$1 ORDER BY start_ms",[projectId])).rows.map(c=>({id:c.id,startMs:Number(c.start_ms),endMs:Number(c.end_ms),text:c.text,language:c.language??undefined,style:c.style??{position:"bottom"}}));
+ const durationMs=Math.max(0,...videoClips.map(c=>c.timelineStartMs+c.timelineDurationMs));
+ const manifest:RenderManifest={schemaVersion:1,projectId,profile,durationMs,videoClips,audioClips,subtitles,subtitleMode:options.subtitleMode??(options.includeSubtitles?options.burnInSubtitles?"burn_in":"sidecar":"none"),expectedAudio:audioClips.some(c=>!c.muted),createdAt:new Date().toISOString()};
+ const v=validateRenderManifest(manifest);if(!v.valid)throw new Error(v.errors.join("; "));
+ return(await db.query("INSERT INTO render_jobs(project_id,profile,options,manifest) VALUES($1,$2,$3,$4) RETURNING *",[projectId,profile,{...options,manifestSnapshot:true},manifest])).rows[0];
+}
