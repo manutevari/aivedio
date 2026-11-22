@@ -42,4 +42,13 @@
 - [x] Streamlit API-connected project/Flow/assets/jobs workspace
 - [x] Explicit API-offline state
 - [x] Generation jobs start awaiting human approval; worker only claims safety-approved jobs
-- [ ] Authentication/RBAC for approvals, real upload/storage, media previews, timeline editing, rendering, QA agents, integration tests
+- [ ] Authentication/RBAC for approvals, real upload/storage, media previews, QA agents, integration tests
+## Phase 8 — Timeline, editing and render pipeline
+- [x] Persistent tracks and clips schema
+- [x] Timeline API: tracks/clips CRUD, split and trim
+- [x] Timeline validation and time/source-range contracts
+- [x] Render profile validation and render job queue
+- [x] FFmpeg worker execution foundation (shell=false)
+- [x] MEDIA_ROOT path confinement and render output directory
+- [x] React timeline overview and render queue UI
+- [ ] Multi-track composition, transitions, audio mixing/ducking, subtitles, overlays, object storage, auth, output QA, tests
