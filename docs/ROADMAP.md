@@ -125,3 +125,15 @@
 - [x] Audio QA queue, reports and worker using FFmpeg/FFprobe loudness, peak, clipping and silence analysis
 - [x] Configurable ducking contracts and API
 - [ ] Sidechain ducking in render graph, voice generation/recording adapters, music/SFX search, lip-sync measurement, UI and integration tests
+
+## Phase 16 — Intelligent Rendering Engine
+- [x] Versioned immutable render-manifest contract and validation
+- [x] API snapshot of project timeline, released media, mix settings and subtitles
+- [x] Timeline-aware FFmpeg compiler: multiple visual layers, still images, positioned clips, scaling, frame rate and mixed audio
+- [x] Subtitle burn-in or sidecar SRT export
+- [x] FFmpeg execution using shell=false and confined input/output paths
+- [x] Render job lease claiming and expired-lease recovery
+- [x] Retry/backoff, checkpoints and atomic partial-output rename
+- [x] Post-render ffprobe QA: stream presence, duration, resolution and expected audio
+- [x] Human review gate before marking final delivery complete
+- [ ] Advanced transition implementation, sidechain ducking, subtitles styling, overlays/graphics, black/frozen-frame and audio loudness QA, download endpoint/object storage, authenticated review UI, integration tests
