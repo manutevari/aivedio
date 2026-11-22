@@ -1,4 +1,6 @@
 import Fastify from "fastify";
+import {enrichCreativePlan,listScriptPackages,getScriptPackage,reviewScriptPackage} from './scriptwriting.js';
+
 import {createPlan,listPlans,getPlan,updatePlan,approvePlan,createPlanRevision} from './creative-plans.js';
 
 import { classifyNode, decideNextAction, analyzeCreativeBrief, optimizeContext, buildProductionGraph, continuityChecklist, routeCapability } from "@aivedio/core";
@@ -87,4 +89,8 @@ app.get('/v1/projects/:id/creative-plans',async(request)=>listPlans((request.par
 app.get('/v1/projects/:id/creative-plans/:planId',async(request,reply)=>{const p=await getPlan((request.params as {id:string;planId:string}).id,(request.params as {planId:string}).planId);if(!p)return reply.status(404).send({error:'Plan not found'});return p});
 app.patch('/v1/projects/:id/creative-plans/:planId',async(request,reply)=>{try{const p=await updatePlan((request.params as {id:string;planId:string}).id,(request.params as {planId:string}).planId,request.body as any);if(!p)return reply.status(404).send({error:'Plan not found'});return p}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.post('/v1/projects/:id/creative-plans/:planId/approve',async(request,reply)=>{try{return await approvePlan((request.params as {id:string;planId:string}).id,(request.params as {planId:string}).planId,(request.body as {reviewer:string}).reviewer)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post('/v1/projects/:id/creative-plans/:planId/script-packages',async(request,reply)=>{try{return reply.status(201).send(await enrichCreativePlan((request.params as {id:string;planId:string}).id,(request.params as {planId:string}).planId,request.body as any))}catch(e){return reply.status(422).send({error:e instanceof Error?e.message:String(e)})}});
+app.get('/v1/projects/:id/script-packages',async(request)=>{const q=request.query as {planId?:string};return listScriptPackages((request.params as {id:string}).id,q.planId)});
+app.get('/v1/projects/:id/script-packages/:packageId',async(request,reply)=>{const p=await getScriptPackage((request.params as {id:string;packageId:string}).id,(request.params as {packageId:string}).packageId);if(!p)return reply.status(404).send({error:'Package not found'});return p});
+app.post('/v1/projects/:id/script-packages/:packageId/review',async(request,reply)=>{try{const b=request.body as {decision:'approve'|'reject';reviewer:string;notes?:string};if(!['approve','reject'].includes(b?.decision))return reply.status(400).send({error:'decision must be approve or reject'});return await reviewScriptPackage((request.params as {id:string;packageId:string}).id,(request.params as {packageId:string}).packageId,b.decision,b.reviewer,b.notes)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 const port=Number(process.env.PORT??3000);await app.listen({port,host:"0.0.0.0"});
