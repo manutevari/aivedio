@@ -14,4 +14,4 @@ export async function createScene(projectId:string,input:{title:string;prompt?:s
 export async function updateScene(id:string,input:Record<string,unknown>){
  return (await requireDb()!.query("UPDATE scenes SET title=COALESCE($2,title),prompt=COALESCE($3,prompt),duration_seconds=COALESCE($4,duration_seconds),status=COALESCE($5,status),metadata=COALESCE($6,metadata),updated_at=now() WHERE id=$1 RETURNING *",[id,input.title??null,input.prompt??null,input.durationSeconds??null,input.status??null,input.metadata??null])).rows[0]??null;
 }
-export async function deleteScene(id:string){return (await requireDb()!.query("DELETE FROM scenes WHERE id=$1 RETURNING id",[id])).rowCount>0;}
+export async function deleteScene(id:string){const db=requireDb() as any;const result=await db.query("DELETE FROM scenes WHERE id=$1 RETURNING id",[id]);return Number(result?.rowCount??0)>0;}
