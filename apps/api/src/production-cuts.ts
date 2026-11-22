@@ -20,12 +20,12 @@ export async function createProductionCut(projectId:string,input:{scriptPackageI
  try{
   await client.query("BEGIN");
   await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[projectId]);
-  const source=await client.query("SELECT p.id plan_id,p.status plan_status,p.plan,c.id script_package_id,c.status script_status,c.content script_content,c.pricing_free_verified FROM creative_script_packages c JOIN creative_plans p ON p.id=c.plan_id AND p.project_id=c.project_id WHERE c.project_id=$1 AND c.id=$2 FOR SHARE OF c,p",[projectId,input.scriptPackageId]);
+  const source=await client.query("SELECT p.id plan_id,p.status plan_status,p.plan,c.id script_package_id,c.status script_status,c.content script_content,c.validation script_validation,c.pricing_free_verified FROM creative_script_packages c JOIN creative_plans p ON p.id=c.plan_id AND p.project_id=c.project_id WHERE c.project_id=$1 AND c.id=$2 FOR SHARE OF c,p",[projectId,input.scriptPackageId]);
   if(!source.rowCount)throw new Error("Script package not found in this project");
   const row=source.rows[0];
   if(row.plan_status!=="approved")throw new Error("Creative plan must be approved before timeline assembly");
   if(row.script_status!=="approved")throw new Error("Script package must be approved before timeline assembly");
-  if(row.pricing_free_verified!==true)throw new Error("Script package does not have verified free-model provenance");
+  if(row.pricing_free_verified!==true)throw new Error("Script package does not have verified free-model provenance");\n  if(!row.script_validation||row.script_validation.valid!==true)throw new Error("Script package validation must be successful before timeline assembly");
   const assetRows=(await client.query(assetSelect,[projectId])).rows as AssetRow[];
   const plan=row.plan as CreativePlan;const script=row.script_content as CreativeScriptContent;
   const draft=buildProductionCut(plan,script,row.script_package_id,assetRows.map(asCandidate),{assetAssignments:input.assetAssignments??{}});
