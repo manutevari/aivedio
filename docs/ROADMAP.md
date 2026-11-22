@@ -25,4 +25,13 @@
 - [x] Routing API contracts
 - [ ] Official MCP SDK runtime, real provider adapters, secure auth vault, worker execution, safety/QA pipelines
 ## Phase 6 — Media worker and generation execution
-- Worker queue, provider adapters, asset ingestion, generation, QA, retry/repair
+- [x] Worker app package and process lifecycle
+- [x] Durable job claiming with row locks and SKIP LOCKED
+- [x] Safety-approved jobs only are claimable
+- [x] Reviewed provider-adapter contract and adapter registry
+- [x] Asset validation and quarantine persistence
+- [x] Baseline result quality assessment
+- [x] Retry/backoff and lease metadata
+- [ ] Real provider adapters, object storage, lease renewal, moderation/technical QA, auth, observability, integration tests
+## Phase 7 — Studio UI and production pipeline
+- Flow UI, asset browser, approvals, generation monitoring, timeline, editing, rendering
