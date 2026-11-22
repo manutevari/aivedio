@@ -16,3 +16,5 @@ export * from './scriptwriting.js';
 export * from './asset-intelligence.js';
 
 export * from './quality.js';
+
+export * from './production-editing.js';
