@@ -11,8 +11,10 @@ Quality-first foundation for multimodal creative production: video, films, anima
 - Flow project and scene models
 - Fail-closed safety contract
 - Checkpoint interfaces
+- React/Vite UI
+- Optional Streamlit UI adapter
 
-## Run locally
+## Run the Node API and React UI
 Requires Node.js 20+ and pnpm 9+.
 
 ```bash
@@ -22,4 +24,15 @@ pnpm dev
 
 API health: http://localhost:3000/health
 
-**Important:** Provider integrations, persistence, authentication, UI and production safety classifiers are not yet implemented. The safety interface deliberately returns uncertainty when no classifier is connected.
+## Run Streamlit UI
+Requires Python 3.10+.
+
+```bash
+cd apps/streamlit
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Set `AIVEDIO_API_URL` to the API base URL when the API is running.
+
+**Important:** Provider integrations, persistence, authentication, production safety classifiers and actual media generation are not yet implemented. The safety interface deliberately returns uncertainty when no classifier is connected.
