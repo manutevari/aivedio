@@ -72,3 +72,13 @@
 - [x] Plan validation and versioned persistence
 - [x] Plan list, fetch, update and approval API
 - [ ] Free-only LLM enrichment, reference-aware prompts, factual research/citations, Flow UI and continuity QA
+
+## Phase 11 — Scriptwriting & Prompt Enrichment
+- [x] Free-only OpenRouter model routing and pinned model verification
+- [x] Structured screenplay, dialogue, narration, scene action and on-screen text
+- [x] Shot-specific prompt and negative prompt generation
+- [x] Project reference and character context ingestion
+- [x] Optional Tavily research with source-linked factual claims
+- [x] Scene/shot coverage and citation validation
+- [x] Versioned script packages and review/approval APIs
+- [ ] Authenticated review, integration tests, provider error retry UX and UI
