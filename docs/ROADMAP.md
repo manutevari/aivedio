@@ -52,3 +52,14 @@
 - [x] MEDIA_ROOT path confinement and render output directory
 - [x] React timeline overview and render queue UI
 - [ ] Multi-track composition, transitions, audio mixing/ducking, subtitles, overlays, object storage, auth, output QA, tests
+
+## Phase 9 — Advanced Editing & Audio Composition
+- [x] Transition and subtitle cue validation contracts
+- [x] Persistent subtitle cue records and APIs
+- [x] Non-destructive edit decision records
+- [x] Per-track audio mix settings API (gain/mute/ducking config)
+- [x] Composition filter-graph planner for cuts, fades/dissolves, wipes/slides and synchronized audio layers
+- [x] FFmpeg argument compiler (safe argv, no shell)
+- [ ] Integrate composition planner into render worker
+- [ ] Subtitle burn-in, sidechain ducking, overlays and visual QA
+- [ ] End-to-end rendering tests and authenticated review
