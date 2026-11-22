@@ -8,7 +8,7 @@ type Asset={id:string;kind:string;status:string;storage_key:string;mime_type:str
 type Job={id:string;task:string;status:string;safety_status:string;quality_status:string;provider_id:string;created_at:string;error?:string};
 const tabs=["Overview","Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs"];
 const modes=["Simple Mode","Flow Mode","Pro Mode","Studio Mode"];
-const req=(method:string,body?:unknown):RequestInit=>({method,body:body===undefined?undefined:JSON.stringify(body)});
+const req=(method:string,body?:unknown):RequestInit=>({method,...(body===undefined?{}:{body:JSON.stringify(body)})});
 async function api<T=any>(url:string,init?:RequestInit):Promise<T>{
  const r=await fetch(API+url,{...init,headers:{"content-type":"application/json",...(init?.headers??{})}});
  if(!r.ok){let detail="";try{detail=await r.text()}catch{}throw new Error(detail||r.statusText||"API request failed")}
@@ -64,11 +64,11 @@ export default function App(){
    ]);
    const [s,a,j,t,r,p,sp,c,au,qr,sr,rf,ch]=results;
    setScenes(s);setAssets(a);setJobs(j);setTimeline(t);setRenderJobs(r);setPlans(p);setScripts(sp);setCuts(c);setAudioPlans(au);setReports(qr);setReviews(sr);setReferences(rf);setCharacters(ch);
-   if(!sceneId&&s.length)setSceneId(s[0].id);
-   if(!planId&&p.length)setPlanId(p[0].id);
-   if(!scriptId&&sp.length)setScriptId(sp[0].id);
-   if(!cutId&&c.length)setCutId(c[0].id);
-   if(!audioId&&au.length)setAudioId(au[0].id);
+   if(!sceneId&&s[0]?.id)setSceneId(s[0].id);
+   if(!planId&&p[0]?.id)setPlanId(p[0].id);
+   if(!scriptId&&sp[0]?.id)setScriptId(sp[0].id);
+   if(!cutId&&c[0]?.id)setCutId(c[0].id);
+   if(!audioId&&au[0]?.id)setAudioId(au[0].id);
   }catch(e){setOffline(true);setError(e instanceof Error?e.message:String(e))}
  },[projectId,sceneId,planId,scriptId,cutId,audioId,loadProjects]);
  useEffect(()=>{void refresh()},[]);
