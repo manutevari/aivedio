@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS media_providers(provider_id TEXT PRIMARY KEY,name TEXT NOT NULL,source TEXT NOT NULL,descriptor JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS generation_jobs(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,scene_id UUID REFERENCES scenes(id) ON DELETE SET NULL,task TEXT NOT NULL,provider_id TEXT NOT NULL REFERENCES media_providers(provider_id),prompt TEXT NOT NULL,input_assets JSONB NOT NULL DEFAULT '[]',parameters JSONB NOT NULL DEFAULT '{}',status TEXT NOT NULL DEFAULT 'queued',attempt INTEGER NOT NULL DEFAULT 0,result JSONB,error TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS generation_jobs_project_idx ON generation_jobs(project_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS generation_jobs_status_idx ON generation_jobs(status,created_at);
