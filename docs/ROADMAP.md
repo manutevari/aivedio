@@ -93,3 +93,14 @@
 - [x] Optional FFmpeg/ffprobe technical metadata and sampled keyframes
 - [x] Explicit unavailable states for vision, embeddings, transcription and scene-boundary adapters
 - [ ] Authenticated upload/storage, malware scanning, lease renewal, vector embeddings, provider adapters, UI and integration tests
+
+## Phase 13 — Continuity, Safety & Quality Intelligence
+- [x] Typed QA findings, severity, confidence, report and decision contracts
+- [x] Deterministic scene-to-scene continuity comparison (provided snapshots)
+- [x] Technical profile validation: dimensions, frame rate, duration, black/frozen frames, silence metadata
+- [x] PostgreSQL QA job/report and safety-review persistence (migration 011)
+- [x] API endpoints for quality jobs/reports, continuity reviews and human safety review
+- [x] Technical QA worker with FFprobe/FFmpeg metadata and black-frame detection; path confinement
+- [x] Safety classifier unavailable is explicitly held for HITL; no fabricated clear verdict
+- [ ] Actual moderation/classifier adapters, visual continuity/character matching, audio loudness/clipping DSP, automatic repair execution
+- [ ] Authentication/RBAC, worker lease recovery, integration tests and Studio UI
