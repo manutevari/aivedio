@@ -31,7 +31,7 @@ export function compileRender(manifest:RenderManifest,paths:string[],outputPath:
   const rate=c.playbackRate;
   const gain=Math.pow(10,c.trackGainDb/20)*c.volume;
   const delay=Math.round(c.timelineStartMs);
-  let filter=`[${idx}:a]atrim=start=${sec(c.sourceStartMs)}:duration=${sec(c.timelineDurationMs*rate)},asetpts=PTS-STARTPTS,atempo=${rate},volume=${gain.toFixed(6)},adelay=${delay}| ${delay},aformat=sample_rates=${manifest.profile.audioSampleRate}:channel_layouts=stereo`;
+  let filter=`[${idx}:a]atrim=start=${sec(c.sourceStartMs)}:duration=${sec(c.sourceDurationMs)},asetpts=PTS-STARTPTS,atempo=${rate},volume=${gain.toFixed(6)},adelay=${delay}|${delay},aformat=sample_rates=${manifest.profile.audioSampleRate}:channel_layouts=stereo`;
   // Ducking is deliberately only compiled if an active dialogue signal exists.
   const duck=c.ducking?.enabled&&manifest.audioClips.some(x=>x.trackKind==="audio"&&!x.muted);
   // Ducking config is retained in the manifest but not executed until a dialogue sidechain is compiled safely.
