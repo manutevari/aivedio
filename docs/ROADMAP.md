@@ -82,3 +82,14 @@
 - [x] Scene/shot coverage and citation validation
 - [x] Versioned script packages and review/approval APIs
 - [ ] Authenticated review, integration tests, provider error retry UX and UI
+
+## Phase 12 — Multimodal Asset Intelligence
+- [x] Extraction contracts and capability registry
+- [x] Asset analysis queue and extraction/chunk/keyframe schema
+- [x] Queue request, status, retrieval and project media search API
+- [x] Python worker with confined storage path validation
+- [x] Metadata extraction and PDF/DOCX/XLSX/text extraction
+- [x] Optional OCR integration with explicit unavailable status
+- [x] Optional FFmpeg/ffprobe technical metadata and sampled keyframes
+- [x] Explicit unavailable states for vision, embeddings, transcription and scene-boundary adapters
+- [ ] Authenticated upload/storage, malware scanning, lease renewal, vector embeddings, provider adapters, UI and integration tests
