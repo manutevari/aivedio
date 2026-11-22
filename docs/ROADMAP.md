@@ -104,3 +104,13 @@
 - [x] Safety classifier unavailable is explicitly held for HITL; no fabricated clear verdict
 - [ ] Actual moderation/classifier adapters, visual continuity/character matching, audio loudness/clipping DSP, automatic repair execution
 - [ ] Authentication/RBAC, worker lease recovery, integration tests and Studio UI
+
+## Phase 14 — Intelligent Production Timeline & Editing
+- [x] Deterministic production-cut compiler from approved plan + approved script package
+- [x] Per-shot timing, shot prompt, negative prompt and explicit asset assignment/matching
+- [x] Missing/ambiguous asset states and readiness score
+- [x] Asset release, technical QA and safety-clear gates before materialization
+- [x] Versioned production-cut persistence (migration 012)
+- [x] Non-destructive apply to a new video timeline track with shot metadata
+- [x] Timeline edit manifest API integrating clips, tracks, subtitles, transitions and audio-mix settings
+- [ ] UI/Flow workspace integration, automatic subtitle cue creation, render-worker integration, integration tests and auth/RBAC
