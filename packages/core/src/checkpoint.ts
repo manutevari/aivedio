@@ -1,0 +1,2 @@
+export interface WorkflowCheckpoint {id:string;workflowRunId:string;nodeId:string;state:"saved"|"restored"|"failed";payload:Record<string,unknown>;artifactVersionIds:string[];confidence?:number;qualitySummary?:Record<string,unknown>;approvalIds:string[];createdAt:string;}
+export interface CheckpointStore {save(checkpoint:WorkflowCheckpoint):Promise<void>;get(checkpointId:string):Promise<WorkflowCheckpoint|null>;latest(workflowRunId:string):Promise<WorkflowCheckpoint|null>;}
