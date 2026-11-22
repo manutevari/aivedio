@@ -11,7 +11,7 @@ export function resolveMediaPath(key:string,root=process.env.MEDIA_ROOT??"./medi
 }
 export function compileRender(manifest:RenderManifest,paths:string[],outputPath:string,sidecarPath?:string):CompiledRender{
  const validation=validateRenderManifest(manifest);if(!validation.valid)throw new Error(validation.errors.join("; "));
- const args:string[]=[];manifest.videoClips.forEach((c,i)=>{if(c.mimeType.startsWith("image/"))args.push("-loop","1","-t",sec(c.timelineDurationMs)," -i".trim(),paths[i]!);else args.push("-i",paths[i]!)});
+ const args:string[]=[];manifest.videoClips.forEach((c,i)=>{if(c.mimeType.startsWith("image/"))args.push("-loop","1","-t",sec(c.timelineDurationMs),"-i",paths[i]!);else args.push("-i",paths[i]!)});
  manifest.audioClips.forEach((c,i)=>{args.push("-i",paths[manifest.videoClips.length+i]!)});
  const filters:string[]=[];
  const duration=manifest.durationMs/1000;
