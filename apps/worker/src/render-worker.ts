@@ -1,6 +1,6 @@
 import pg from "pg";
 import path from "node:path";
-import fs from "node:fs/promises";
+import fs from "node:fs/promises";\nimport {createReadStream} from "node:fs";
 import crypto from "node:crypto";
 import {resolveMediaPath,compileRender,runFfmpeg,probeOutput} from "./render-plan.js";
 import type {RenderManifest} from "@aivedio/core";
@@ -43,7 +43,7 @@ async function run(j:any){
  await checkpoint(j.id,"output_qa",0.95,{qaStatus,findings,probeSummary:{duration:actualDuration,width:video?.width,height:video?.height,videoCodec:video?.codec_name,audioCodec:audio?.codec_name}});
  if(qaStatus==="fail"){await fs.rm(temp,{force:true});throw new Error("Post-render QA failed: "+findings.map(x=>x.code).join(", "))}
  await fs.rename(temp,final);
- const data=await fs.readFile(final);const checksum=crypto.createHash("sha256").update(data).digest("hex");const stat=await fs.stat(final);
+ const checksum=await new Promise<string>((resolve,reject)=>{const hash=crypto.createHash("sha256"),stream=createReadStream(final);stream.on("data",chunk=>hash.update(chunk));stream.on("error",reject);stream.on("end",()=>resolve(hash.digest("hex")))});const stat=await fs.stat(final);
  const sidecar=manifest.subtitleMode==="sidecar"&&manifest.subtitles.length?await fs.stat(subPath):null;
  await pool.query("UPDATE render_jobs SET status='awaiting_review',stage='rendered',progress=1,output_storage_key=$2,output_checksum=$3,output_size_bytes=$4,qa_status=$5,qa_report=$6,review_status='pending',lease_owner=NULL,lease_expires_at=NULL,completed_at=now(),updated_at=now() WHERE id=$1 AND lease_owner=$7",[j.id,path.relative(outRoot,final),checksum,stat.size,qaStatus,{findings,probeSummary:{duration:actualDuration,width:video?.width,height:video?.height,videoCodec:video?.codec_name,audioCodec:audio?.codec_name},sidecar:sidecar?path.relative(outRoot,subPath):null},workerId]);
  console.log("Render ready for review",j.id,stat.size,qaStatus);
