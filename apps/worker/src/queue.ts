@@ -11,7 +11,6 @@ export async function claimNextJob():Promise<WorkerJob|null>{
  const r=await client.query(`SELECT * FROM generation_jobs WHERE provider_id=ANY($1::text[]) AND status='queued' AND safety_status='approved' AND available_at<=now() AND (lease_expires_at IS NULL OR lease_expires_at<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`,[ids]);
  if(!r.rowCount){await client.query("COMMIT");return null}
  const row=r.rows[0];const upd=await client.query("UPDATE generation_jobs SET status='running',lease_owner=$2,lease_expires_at=now()+($3||' seconds')::interval,attempt=attempt+1,started_at=COALESCE(started_at,now()),updated_at=now() WHERE id=$1 RETURNING *",[row.id,WORKER_ID,String(LEASE_SECONDS)]);
- await client.query("INSERT INTO workflow_events(run_id,event_type,payload) SELECT id,'generation_job_claimed',$2 FROM workflow_runs WHERE id=(SELECT NULL::uuid) ",[row.id,{workerId:WORKER_ID}]).catch(()=>{});
  await client.query("COMMIT");const j=upd.rows[0];return{id:j.id,projectId:j.project_id,sceneId:j.scene_id??undefined,task:j.task,providerId:j.provider_id,prompt:j.prompt,inputAssets:j.input_assets??[],parameters:j.parameters??{},status:j.status,attempt:j.attempt,maxAttempts:j.max_attempts,workerId:WORKER_ID,leaseExpiresAt:j.lease_expires_at?.toISOString(),safetyStatus:j.safety_status};
  }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
 }
