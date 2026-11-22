@@ -5,7 +5,7 @@ import {validateSubtitleCue,SubtitleCue} from "./editing.js";
 export type RenderTransition="cut"|"fade"|"dissolve";
 export interface RenderVideoInput{
  assetId:string;storageKey:string;mimeType:string;title:string;
- sourceStartMs:number;timelineStartMs:number;timelineDurationMs:number;
+ sourceStartMs:number;sourceDurationMs:number;timelineStartMs:number;timelineDurationMs:number;
  opacity:number;playbackRate:number;zIndex:number;trackOrder:number;
  transitionIn?:RenderTransition;transitionDurationMs?:number;
 }
@@ -32,14 +32,14 @@ export function validateRenderManifest(m:RenderManifest){
  const errors:string[]=[];
  if(m.schemaVersion!==1)errors.push("Unsupported render manifest version");
  if(!m.projectId)errors.push("Project id is required");
- const p=validateRenderProfile(m.profile);errors.push(...p.errors);
+ const p=validateRenderProfile(m.profile);errors.push(...p.errors);if(m.profile?.container==="webm"&&m.profile.audioCodec!=="opus")errors.push("WebM renders require Opus audio");
  if(!Number.isFinite(m.durationMs)||m.durationMs<=0||m.durationMs>12*60*60*1000)errors.push("Render duration must be between 1ms and 12 hours");
  if(!Array.isArray(m.videoClips)||!m.videoClips.length)errors.push("At least one visual clip is required");
  if((m.videoClips?.length??0)>1000||(m.audioClips?.length??0)>2000)errors.push("Render exceeds the configured clip count limit");
  for(const [i,c] of (m.videoClips??[]).entries()){
   if(!safeStorageKey(c.storageKey))errors.push("Video clip "+i+" has an unsafe storage key");
   if(!c.mimeType.startsWith("video/")&&!c.mimeType.startsWith("image/"))errors.push("Video clip "+i+" has unsupported media type");
-  if(!Number.isFinite(c.sourceStartMs)||c.sourceStartMs<0||!Number.isFinite(c.timelineStartMs)||c.timelineStartMs<0||!Number.isFinite(c.timelineDurationMs)||c.timelineDurationMs<=0)errors.push("Video clip "+i+" has invalid timing");
+  if(!Number.isFinite(c.sourceStartMs)||c.sourceStartMs<0||!Number.isFinite(c.sourceDurationMs)||c.sourceDurationMs<=0||!Number.isFinite(c.timelineStartMs)||c.timelineStartMs<0||!Number.isFinite(c.timelineDurationMs)||c.timelineDurationMs<=0)errors.push("Video clip "+i+" has invalid timing");
   if(c.timelineStartMs+c.timelineDurationMs>m.durationMs+100)errors.push("Video clip "+i+" exceeds composition duration");
   if(!Number.isFinite(c.opacity)||c.opacity<0||c.opacity>1)errors.push("Video clip "+i+" opacity must be 0–1");
   if(!Number.isFinite(c.playbackRate)||c.playbackRate<0.25||c.playbackRate>4)errors.push("Video clip "+i+" playback rate must be 0.25–4");
