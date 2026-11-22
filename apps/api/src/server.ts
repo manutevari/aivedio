@@ -1,4 +1,6 @@
 import Fastify from "fastify";
+import {createPlan,listPlans,getPlan,updatePlan,approvePlan,createPlanRevision} from './creative-plans.js';
+
 import { classifyNode, decideNextAction, analyzeCreativeBrief, optimizeContext, buildProductionGraph, continuityChecklist, routeCapability } from "@aivedio/core";
 import {pool,requireDb} from "./db.js";
 import {listProjects,createProject,getProject,updateProject,listScenes,createScene,updateScene,deleteScene} from "./projects.js";
@@ -80,4 +82,9 @@ app.post("/v1/workflows/:id/transition",async(request,reply)=>{try{return await 
 app.post("/v1/workflows/:id/checkpoints",async(request,reply)=>{const body=request.body as {nodeId:string;payload:unknown};if(!body?.nodeId)return reply.status(400).send({error:"nodeId required"});return reply.status(201).send(await saveCheckpoint((request.params as {id:string}).id,body.nodeId,body.payload??{}));});
 app.get("/v1/workflows/:id/events",async(request)=>{return (await requireDb().query("SELECT * FROM workflow_events WHERE run_id=$1 ORDER BY id",(request.params as {id:string}).id)).rows;});
 app.get("/v1/workflows/:id/checkpoints",async(request)=>{return (await requireDb().query("SELECT * FROM checkpoints WHERE run_id=$1 ORDER BY created_at DESC",(request.params as {id:string}).id)).rows;});
+app.post('/v1/projects/:id/creative-plans',async(request,reply)=>{try{return reply.status(201).send(await createPlan((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get('/v1/projects/:id/creative-plans',async(request)=>listPlans((request.params as {id:string}).id));
+app.get('/v1/projects/:id/creative-plans/:planId',async(request,reply)=>{const p=await getPlan((request.params as {id:string;planId:string}).id,(request.params as {planId:string}).planId);if(!p)return reply.status(404).send({error:'Plan not found'});return p});
+app.patch('/v1/projects/:id/creative-plans/:planId',async(request,reply)=>{try{const p=await updatePlan((request.params as {id:string;planId:string}).id,(request.params as {planId:string}).planId,request.body as any);if(!p)return reply.status(404).send({error:'Plan not found'});return p}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post('/v1/projects/:id/creative-plans/:planId/approve',async(request,reply)=>{try{return await approvePlan((request.params as {id:string;planId:string}).id,(request.params as {planId:string}).planId,(request.body as {reviewer:string}).reviewer)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 const port=Number(process.env.PORT??3000);await app.listen({port,host:"0.0.0.0"});
