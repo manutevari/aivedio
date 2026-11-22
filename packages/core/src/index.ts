@@ -13,3 +13,4 @@ export * from "./editing.js";
 export * from "./creative-director.js";
 export * from './creative-director.js';
 export * from './scriptwriting.js';
+export * from './asset-intelligence.js';
