@@ -43,7 +43,8 @@ def analyze(path):
  for i,(end,dur) in enumerate(ends):
   start=float(starts[i]) if i<len(starts) else max(0,float(end)-float(dur))
   metrics["silenceIntervals"].append({"start":start,"end":float(end),"duration":float(dur)})
- metrics["analysisAvailable"]=True
+ metrics["analysisAvailable"]=e.returncode==0 and a.returncode==0 and sil.returncode==0
+ if not metrics["analysisAvailable"]:metrics["warnings"].append("One or more FFmpeg analysis passes failed")
  if metrics["integratedLufs"] is None:metrics["warnings"].append("Integrated loudness not parsed")
  if metrics["truePeakDbtp"] is None:metrics["warnings"].append("True peak not parsed")
  return metrics
