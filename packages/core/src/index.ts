@@ -20,3 +20,5 @@ export * from './quality.js';
 export * from './production-editing.js';
 
 export * from './audio-intelligence.js';
+
+export * from "./rendering.js";
