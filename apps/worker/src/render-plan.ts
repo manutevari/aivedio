@@ -11,7 +11,7 @@ export function resolveMediaPath(key:string,root=process.env.MEDIA_ROOT??"./medi
 }
 export function compileRender(manifest:RenderManifest,paths:string[],outputPath:string,sidecarPath?:string):CompiledRender{
  const validation=validateRenderManifest(manifest);if(!validation.valid)throw new Error(validation.errors.join("; "));
- const args:string[]=[];manifest.videoClips.forEach((c,i)=>{args.push("-i",paths[i]!)});
+ const args:string[]=[];manifest.videoClips.forEach((c,i)=>{if(c.mimeType.startsWith("image/"))args.push("-loop","1","-t",sec(c.timelineDurationMs)," -i".trim(),paths[i]!);else args.push("-i",paths[i]!)});
  manifest.audioClips.forEach((c,i)=>{args.push("-i",paths[manifest.videoClips.length+i]!)});
  const filters:string[]=[];
  const duration=manifest.durationMs/1000;
@@ -20,7 +20,7 @@ export function compileRender(manifest:RenderManifest,paths:string[],outputPath:
  manifest.videoClips.forEach((c,i)=>{
   const label="v"+i;
   const rate=c.playbackRate;
-  filters.push(`[${i}:v]trim=start=${sec(c.sourceStartMs)}:duration=${sec(c.timelineDurationMs*rate)},setpts=(PTS-STARTPTS)/${rate},scale=${manifest.profile.width}:${manifest.profile.height}:force_original_aspect_ratio=decrease,pad=${manifest.profile.width}:${manifest.profile.height}:(ow-iw)/2:(oh-ih)/2,fps=${manifest.profile.fps},setsar=1,format=rgba,colorchannelmixer=aa=${c.opacity}[${label}]`);
+  filters.push(`[${i}:v]trim=start=${sec(c.sourceStartMs)}:duration=${sec(c.sourceDurationMs)},setpts=(PTS-STARTPTS)/${rate},scale=${manifest.profile.width}:${manifest.profile.height}:force_original_aspect_ratio=decrease,pad=${manifest.profile.width}:${manifest.profile.height}:(ow-iw)/2:(oh-ih)/2,fps=${manifest.profile.fps},setsar=1,format=rgba,colorchannelmixer=aa=${c.opacity}[${label}]`);
   const out="ov"+i;filters.push(`[${current}][${label}]overlay=eof_action=pass:shortest=0:enable='between(t,${sec(c.timelineStartMs)},${sec(c.timelineStartMs+c.timelineDurationMs)})'[${out}]`);current=out;
  });
  let videoOut=current;
@@ -34,7 +34,7 @@ export function compileRender(manifest:RenderManifest,paths:string[],outputPath:
   let filter=`[${idx}:a]atrim=start=${sec(c.sourceStartMs)}:duration=${sec(c.timelineDurationMs*rate)},asetpts=PTS-STARTPTS,atempo=${rate},volume=${gain.toFixed(6)},adelay=${delay}| ${delay},aformat=sample_rates=${manifest.profile.audioSampleRate}:channel_layouts=stereo`;
   // Ducking is deliberately only compiled if an active dialogue signal exists.
   const duck=c.ducking?.enabled&&manifest.audioClips.some(x=>x.trackKind==="audio"&&!x.muted);
-  if(duck)filter+=`,sidechaincompress=threshold=${Math.pow(10,c.ducking!.thresholdDb/20).toFixed(6)}:ratio=${c.ducking!.ratio}:attack=${c.ducking!.attackMs}:release=${c.ducking!.releaseMs}`;
+  // Ducking config is retained in the manifest but not executed until a dialogue sidechain is compiled safely.
   filters.push(filter+`[${label}]`);audLabels.push(`[${label}]`);
  });
  if(audLabels.length)filters.push(audLabels.join("")+`amix=inputs=${audLabels.length}:duration=longest:normalize=0,alimiter=limit=0.95[aout]`);
