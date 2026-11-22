@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
+import {createAssetQualityJob,listQualityJobs,listQualityReports,getQualityReport,runContinuityReview,applySafetyReview,listSafetyReviews} from './quality.js';
 
 import {enrichCreativePlan,listScriptPackages,getScriptPackage,reviewScriptPackage} from './scriptwriting.js';
 
@@ -18,6 +19,13 @@ import {listGenerationJobs,reviewGenerationJob,listProjectAssets,listProjectAsse
 import {parseReview} from "./validation.js";
 import {listEditDecisions,saveEditDecision,listSubtitles,upsertSubtitle,deleteSubtitle,getMixSettings,saveMixSetting} from "./editing.js";
 const app=Fastify({logger:true});
+app.post("/v1/projects/:id/quality/assets/:assetId/jobs",async(request,reply)=>{try{const p=request.params as {id:string;assetId:string};const b=request.body as {expectedProfile?:Record<string,unknown>;requestedBy?:string};return reply.status(201).send(await createAssetQualityJob(p.id,p.assetId,b?.expectedProfile??{},b?.requestedBy))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/quality/jobs",async(request)=>listQualityJobs((request.params as {id:string}).id));
+app.get("/v1/projects/:id/quality/reports",async(request)=>{const p=request.params as {id:string};const q=request.query as {assetId?:string};return listQualityReports(p.id,q.assetId)});
+app.get("/v1/projects/:id/quality/reports/:reportId",async(request,reply)=>{const p=request.params as {id:string;reportId:string};const r=await getQualityReport(p.id,p.reportId);if(!r)return reply.status(404).send({error:"Quality report not found"});return r});
+app.post("/v1/projects/:id/quality/continuity",async(request,reply)=>{try{const p=request.params as {id:string};const b=request.body as {snapshots:any[]};if(!Array.isArray(b?.snapshots))return reply.status(400).send({error:"snapshots array required"});return reply.status(201).send(await runContinuityReview(p.id,b.snapshots))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/safety/reviews",async(request)=>listSafetyReviews((request.params as {id:string}).id));
+app.post("/v1/projects/:id/quality/reports/:reportId/safety-review",async(request,reply)=>{try{const p=request.params as {id:string;reportId:string};return await applySafetyReview(p.id,p.reportId,request.body as any)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/edit-decisions",async(request)=>listEditDecisions((request.params as {id:string}).id));
 app.post("/v1/projects/:id/edit-decisions",async(request,reply)=>{try{return reply.status(201).send(await saveEditDecision((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/subtitles",async(request)=>listSubtitles((request.params as {id:string}).id));
