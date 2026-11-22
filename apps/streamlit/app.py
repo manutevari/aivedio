@@ -1,111 +1,84 @@
-import os
-import requests
-import streamlit as st
-
-API_URL = os.getenv("AIVEDIO_API_URL", "http://localhost:3000").rstrip("/")
-st.set_page_config(page_title="AIVEDIO Creative Studio", page_icon="🎬", layout="wide")
-
-st.markdown("""
-<style>
-.stApp { background: #080b14; color: #e7eaf5; }
-[data-testid="stSidebar"] { background: #0b0f1a; }
-div[data-testid="stMetric"] { background:#111827; border:1px solid #273149; padding:12px; border-radius:12px; }
-button[kind="primary"] { background:linear-gradient(100deg,#6330ed,#a239ff); border:0; }
-</style>
-""", unsafe_allow_html=True)
-
-if "scene_index" not in st.session_state: st.session_state.scene_index = 0
-if "scenes" not in st.session_state:
-    st.session_state.scenes = [
-        {"title":"Opening — The city","duration":10,"prompt":"Establishing shot of a futuristic city at night."},
-        {"title":"Signal in the rain","duration":15,"prompt":"Rain, neon reflections, mysterious signal."},
-        {"title":"The Discovery","duration":12,"prompt":"Protagonist discovers a signal on a screen."},
-        {"title":"The message","duration":18,"prompt":"A message slowly resolves from static."},
-        {"title":"The vessel","duration":20,"prompt":"A mysterious spacecraft approaches."},
-        {"title":"First contact","duration":16,"prompt":"A vast, atmospheric first-contact moment."},
-    ]
-
+import os, requests, streamlit as st
+API=os.getenv("AIVEDIO_API_URL","http://localhost:3000").rstrip("/")
+st.set_page_config(page_title="AIVEDIO Studio",page_icon="🎬",layout="wide")
+st.markdown("""<style>.stApp{background:#080b14;color:#e7eaf5}[data-testid=stSidebar]{background:#0b0f1a}div[data-testid=stMetric]{background:#111827;border:1px solid #273149;padding:12px;border-radius:12px}</style>""",unsafe_allow_html=True)
+def api(path,method="GET",data=None):
+ r=requests.request(method,API+path,json=data,timeout=10);r.raise_for_status();return r.json() if r.content else None
+if "project" not in st.session_state:st.session_state.project=None
+if "scene_id" not in st.session_state:st.session_state.scene_id=None
 with st.sidebar:
-    st.title("🎬 AIVEDIO")
-    st.caption("Universal AI Creative Studio")
-    if st.button("＋ Create New Project", use_container_width=True):
-        st.session_state.project_name = "Untitled Production"
-    st.divider()
-    st.subheader("Workspace")
-    for item in ["Home","Projects","Workflow","Assets Library","Characters","Locations","Props","Images","Videos","Audio & Music","AI Agents","Models & Providers","MCP Tools","Knowledge Base","Settings"]:
-        st.button(item, key=f"nav_{item}", use_container_width=True)
-    st.divider()
-    try:
-        health=requests.get(f"{API_URL}/health",timeout=2).json()
-        st.success(f"API: {health.get('status','connected')}")
-    except Exception:
-        st.warning("API offline · UI preview mode")
-
-project_name=st.session_state.get("project_name","The Last Signal")
-st.title(project_name)
-st.caption("Film · 12 min · 16:9 · 1080p · 24 FPS")
-modes=st.tabs(["Simple Mode","Flow Mode","Pro Mode","Studio Mode"])
-with modes[0]:
-    st.info("Describe your creative idea. The production planner will orchestrate the workflow when implemented.")
-    st.text_area("Creative brief",placeholder="Describe the film, video, animation, music or multimedia project…",height=160)
-with modes[1]:
-    st.subheader("Flow · Storyboard")
-    left,center,right=st.columns([1.05,2.1,1.15],gap="medium")
-    with left:
-        st.markdown(f"**Scenes ({len(st.session_state.scenes)})**")
-        for i,scene in enumerate(st.session_state.scenes):
-            if st.button(f"{i+1:02d} · {scene['title']} · {scene['duration']}s",key=f"scene_{i}",use_container_width=True):
-                st.session_state.scene_index=i
-        if st.button("＋ Add Scene",use_container_width=True):
-            st.session_state.scenes.append({"title":"New Scene","duration":10,"prompt":""})
-            st.session_state.scene_index=len(st.session_state.scenes)-1
-    current=st.session_state.scenes[st.session_state.scene_index]
-    with center:
-        st.markdown("### Scene Preview")
-        st.markdown(f"#### Scene {st.session_state.scene_index+1}: {current['title']}")
-        st.markdown(f"""
-        <div style="height:280px;border-radius:14px;border:1px solid #33415e;background:
-        radial-gradient(circle at 68% 35%,#167fa6 0,#17385e 22%,#10182b 50%,#060914 80%);
-        display:flex;align-items:center;justify-content:center;font-size:70px;">🌌</div>
-        """,unsafe_allow_html=True)
-        st.caption("Preview placeholder · connect generation provider in a later phase")
-        with st.form("scene_edit"):
-            title=st.text_input("Scene title",value=current["title"])
-            duration=st.number_input("Duration (seconds)",min_value=1,max_value=600,value=int(current["duration"]))
-            prompt=st.text_area("Generation prompt",value=current["prompt"],height=100)
-            action=st.text_input("Action / direction",value="Cinematic movement and character action")
-            dialogue=st.text_input("Dialogue",value="")
-            submitted=st.form_submit_button("Save Scene",type="primary")
-            if submitted:
-                current.update(title=title,duration=duration,prompt=prompt)
-                st.success("Scene updated in this session.")
-        st.button("✨ Generate Scene",type="primary",disabled=True,help="Generation provider is not connected yet")
-    with right:
-        st.subheader("Model Routing")
-        route=st.radio("Selection mode",["Auto","Manual","Per-task"],horizontal=True)
-        st.caption("Auto respects capability, quality, availability and free-tier constraints.")
-        for task in ["Script / Reasoning","Image","Video","Music / Audio"]:
-            st.selectbox(task,["Auto","Manual model (not connected)"],key=f"model_{task}")
-        st.subheader("AI Agents")
-        for name in ["Creative Director","Scene Director","Character Consistency","Visual Continuity","Quality Control","Safety Guard","Production Manager"]:
-            st.write("🟢",name)
-        st.subheader("Project Status")
-        st.progress(0.72)
-        st.write("Planning ✓ · Scenes 5/8 · Generation in progress")
-with modes[2]:
-    st.subheader("Pro Workflow")
-    st.write("Node graph, agent configuration, MCP tool permissions and checkpoints will be added in the Pro workflow phase.")
-with modes[3]:
-    st.subheader("Studio Timeline")
-    st.write("Timeline editing, audio mixing, render settings and export will be implemented in Studio phase.")
-    tracks=["Video","Voice / Dialogue","Music","Sound Effects","Captions"]
-    for track in tracks:
-        st.markdown(f"**{track}**")
-        st.slider(f"{track} timeline",0,100,0,key=f"timeline_{track}",label_visibility="collapsed")
-
-st.divider()
-a,b,c,d=st.columns(4)
-a.metric("Scenes",len(st.session_state.scenes))
-b.metric("Total duration",f"{sum(s['duration'] for s in st.session_state.scenes)} sec")
-c.metric("Mode", "Flow")
-d.metric("Safety", "Not connected")
+ st.title("🎬 AIVEDIO");st.caption("Universal AI Creative Studio")
+ try:st.success(api("/health").get("status","connected"))
+ except Exception:st.error("API offline · persistence disabled")
+ st.header("Workspace")
+ page=st.radio("Open",["Projects","Flow / Storyboard","Assets Library","Generation Jobs","Studio / Timeline"])
+ st.divider()
+ title=st.text_input("New project title",key="new_project_title")
+ if st.button("＋ Create Project",use_container_width=True) and title:
+  try:st.session_state.project=api("/v1/projects","POST",{"title":title,"mode":"flow"});st.success("Created")
+  except Exception as e:st.error(str(e))
+try:projects=api("/v1/projects")
+except Exception as e:projects=[];st.error(f"API not available: {e}")
+if projects:
+ choices={p["title"]:p["id"] for p in projects}
+ chosen=st.selectbox("Project",list(choices),index=list(choices.values()).index(st.session_state.project["id"]) if st.session_state.project and st.session_state.project["id"] in choices.values() else 0)
+ project_id=choices[chosen];st.session_state.project=next(p for p in projects if p["id"]==project_id)
+else:project_id=None
+st.title("AIVEDIO · "+(st.session_state.project.get("title","Studio") if st.session_state.project else "Studio"))
+if page=="Projects":
+ st.subheader("Projects")
+ if projects:st.dataframe(projects,use_container_width=True)
+ st.info("Project records are loaded from the API.")
+elif page=="Flow / Storyboard":
+ if not project_id:st.warning("Create or select a project first.")
+ else:
+  scenes=api(f"/v1/projects/{project_id}/scenes")
+  l,c,r=st.columns([1,2,1])
+  with l:
+   st.subheader(f"Scenes · {len(scenes)}")
+   for s in scenes:
+    if st.button(f"{s.get('scene_order',0)+1} · {s['title']}",key=s["id"]):st.session_state.scene_id=s["id"]
+   if st.button("＋ Add Scene"):
+    new=api(f"/v1/projects/{project_id}/scenes","POST",{"title":f"Scene {len(scenes)+1}","prompt":"","durationSeconds":10,"sceneOrder":len(scenes)});st.session_state.scene_id=new["id"];st.rerun()
+  current=next((s for s in scenes if s["id"]==st.session_state.scene_id),scenes[0] if scenes else None)
+  with c:
+   st.subheader(current["title"] if current else "Scene")
+   st.markdown('<div style="height:240px;border-radius:14px;background:radial-gradient(circle at 70% 35%,#167fa6,#17385e,#10182b,#060914);display:grid;place-items:center;font-size:64px">🌌</div>',unsafe_allow_html=True)
+   if current:
+    with st.form("scene_form"):
+     prompt=st.text_area("Prompt",value=current.get("prompt") or "")
+     st.text_input("Title",value=current["title"],disabled=True)
+     save=st.form_submit_button("Save Scene")
+     if save:api(f"/v1/scenes/{current['id']}","PATCH",{"prompt":prompt});st.success("Saved")
+  with r:
+   st.subheader("Production")
+   st.caption("Provider routing is backend-controlled.")
+   st.write("Auto routing · capability matching · free-tier policy")
+elif page=="Assets Library":
+ if not project_id:st.warning("Select a project.")
+ else:
+  assets=api(f"/v1/assets?projectId={project_id}")
+  st.subheader(f"Assets · {len(assets)}")
+  for a in assets:
+   with st.expander(f"{a['kind']} · {a['status']} · {a['id']}"):
+    st.write(a.get("storage_key"),a.get("mime_type"))
+    if a["status"]=="quarantined":
+     reviewer=st.text_input("Reviewer",key="rev_"+a["id"]);x,y=st.columns(2)
+     if x.button("Approve",key="approve_"+a["id"]):api(f"/v1/assets/{a['id']}/review","POST",{"decision":"approve","reviewer":reviewer or "Streamlit reviewer"});st.success("Approved")
+     if y.button("Reject",key="reject_"+a["id"]):api(f"/v1/assets/{a['id']}/review","POST",{"decision":"reject","reviewer":reviewer or "Streamlit reviewer"});st.success("Rejected")
+elif page=="Generation Jobs":
+ jobs=api(f"/v1/generation-jobs?projectId={project_id}") if project_id else api("/v1/generation-jobs")
+ st.subheader(f"Generation Queue · {len(jobs)}")
+ for j in jobs:
+  with st.expander(f"{j['task']} · {j['status']} · {j['id']}"):
+   st.write("Safety:",j.get("safety_status"),"Quality:",j.get("quality_status"));st.write(j.get("error"))
+   if j["status"]=="awaiting_approval":
+    reviewer=st.text_input("Reviewer",key="jobrev_"+j["id"]);a,b=st.columns(2)
+    if a.button("Approve",key="jobapprove_"+j["id"]):api(f"/v1/generation-jobs/{j['id']}/review","POST",{"decision":"approve","reviewer":reviewer or "Streamlit reviewer"});st.success("Approved; queued")
+    if b.button("Reject",key="jobreject_"+j["id"]):api(f"/v1/generation-jobs/{j['id']}/review","POST",{"decision":"reject","reviewer":reviewer or "Streamlit reviewer"});st.success("Rejected")
+elif page=="Studio / Timeline":
+ st.subheader("Timeline / Production Overview")
+ if project_id:
+  scenes=api(f"/v1/projects/{project_id}/scenes")
+  for s in scenes:st.markdown(f"**Scene {s.get('scene_order',0)+1} · {s['title']}** — {s.get('duration_seconds',10)} sec")
+  st.caption("Timeline is currently read-only preview; editing/render/export will follow.")
