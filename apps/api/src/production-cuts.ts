@@ -25,7 +25,8 @@ export async function createProductionCut(projectId:string,input:{scriptPackageI
   const row=source.rows[0];
   if(row.plan_status!=="approved")throw new Error("Creative plan must be approved before timeline assembly");
   if(row.script_status!=="approved")throw new Error("Script package must be approved before timeline assembly");
-  if(row.pricing_free_verified!==true)throw new Error("Script package does not have verified free-model provenance");\n  if(!row.script_validation||row.script_validation.valid!==true)throw new Error("Script package validation must be successful before timeline assembly");
+  if(row.pricing_free_verified!==true)throw new Error("Script package does not have verified free-model provenance");
+  if(!row.script_validation||row.script_validation.valid!==true)throw new Error("Script package validation must be successful before timeline assembly");
   const assetRows=(await client.query(assetSelect,[projectId])).rows as AssetRow[];
   const plan=row.plan as CreativePlan;const script=row.script_content as CreativeScriptContent;
   const draft=buildProductionCut(plan,script,row.script_package_id,assetRows.map(asCandidate),{assetAssignments:input.assetAssignments??{}});
