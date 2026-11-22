@@ -50,6 +50,7 @@ export async function applyProductionCut(projectId:string,id:string){
   const found=await client.query("SELECT * FROM production_cuts WHERE project_id=$1 AND id=$2 FOR UPDATE",[projectId,id]);
   if(!found.rowCount)throw new Error("Production cut not found");
   const cut=found.rows[0];if(cut.status!=="draft")throw new Error("Only a draft production cut can be applied");
+  const approvals=await client.query("SELECT p.status plan_status,s.status script_status,s.pricing_free_verified,s.validation FROM creative_plans p JOIN creative_script_packages s ON s.plan_id=p.id AND s.project_id=p.project_id WHERE p.project_id=$1 AND p.id=$2 AND s.id=$3 FOR SHARE OF p,s",[projectId,cut.plan_id,cut.script_package_id]);\n  if(!approvals.rowCount||approvals.rows[0].plan_status!=="approved"||approvals.rows[0].script_status!=="approved"||approvals.rows[0].pricing_free_verified!==true||approvals.rows[0].validation?.valid!==true)throw new Error("Plan/script approval or validation is no longer valid");
   const content=jsonObject(cut.content) as ProductionCutDraft;
   const validation=validateProductionCutForApply(content);
   if(!validation.valid)throw new Error(validation.errors.join("; "));
