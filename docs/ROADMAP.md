@@ -34,4 +34,12 @@
 - [x] Retry/backoff and lease metadata
 - [ ] Real provider adapters, object storage, lease renewal, moderation/technical QA, auth, observability, integration tests
 ## Phase 7 — Studio UI and production pipeline
-- Flow UI, asset browser, approvals, generation monitoring, timeline, editing, rendering
+- [x] React Studio API connection: projects/scenes
+- [x] Scene prompt editing and persistence
+- [x] Project scene list and add-scene controls
+- [x] Asset browser with quarantine review
+- [x] Generation-job queue and approval/rejection UI
+- [x] Streamlit API-connected project/Flow/assets/jobs workspace
+- [x] Explicit API-offline state
+- [x] Generation jobs start awaiting human approval; worker only claims safety-approved jobs
+- [ ] Authentication/RBAC for approvals, real upload/storage, media previews, timeline editing, rendering, QA agents, integration tests
