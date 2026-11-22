@@ -27,7 +27,7 @@ async function run(j:any){
  const final=path.join(outRoot,j.id+"."+manifest.profile.container),temp=final+".partial";
  const subPath=path.join(outRoot,j.id+".srt");
  const clips=[...manifest.videoClips,...manifest.audioClips];const paths=clips.map(c=>resolveMediaPath(c.storageKey,root));
- for(const p of paths)await fs.access(p);
+ for(const p of paths){const real=await fs.realpath(p);const realRoot=await fs.realpath(root);if(!real.startsWith(realRoot+path.sep))throw new Error("Media symlink resolves outside MEDIA_ROOT");await fs.access(real);}
  if(manifest.subtitleMode!=="none"&&manifest.subtitles.length)await fs.writeFile(subPath,srt(manifest),"utf8");
  const compiled=compileRender(manifest,paths,temp,manifest.subtitleMode==="burn_in"?subPath:undefined);
  await checkpoint(j.id,"ffmpeg",0.03,{manifestHash:crypto.createHash("sha256").update(JSON.stringify(manifest)).digest("hex")});
