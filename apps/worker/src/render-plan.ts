@@ -44,7 +44,7 @@ export function compileRender(manifest:RenderManifest,paths:string[],outputPath:
  if(audLabels.length)args.push("-c:a",manifest.profile.audioCodec==="opus"?"libopus":manifest.profile.audioCodec==="pcm"?"pcm_s16le":"aac","-ar",String(manifest.profile.audioSampleRate));
  if(manifest.profile.container!=="webm")args.push("-movflags","+faststart");
  args.push("-progress","pipe:1","-nostats","-y","-f",manifest.profile.container,outputPath);
- return{args,expectedDurationMs:manifest.durationMs,subtitleSidecar:manifest.subtitleMode==="sidecar"?sidecarPath:undefined};
+ return{args,expectedDurationMs:manifest.durationMs,...(manifest.subtitleMode==="sidecar"&&sidecarPath?{subtitleSidecar:sidecarPath}:{})};
 }
 export function runFfmpeg(args:string[],progress?:(line:string)=>void,signal?:AbortSignal){
  return new Promise<void>((resolve,reject)=>{const child=spawn("ffmpeg",["-hide_banner","-nostdin",...args],{shell:false,stdio:["ignore","pipe","pipe"],signal});let stderr="";child.stdout.on("data",d=>{const s=String(d);for(const line of s.split(/\r?\n/) )progress?.(line)});child.stderr.on("data",d=>{stderr=(stderr+String(d)).slice(-8000)});child.on("error",reject);child.on("close",code=>code===0?resolve():reject(new Error("FFmpeg exited "+code+": "+stderr)))});
