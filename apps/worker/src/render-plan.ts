@@ -43,7 +43,7 @@ export function compileRender(manifest:RenderManifest,paths:string[],outputPath:
  args.push("-t",sec(manifest.durationMs),"-c:v",manifest.profile.videoCodec==="h265"?"libx265":manifest.profile.videoCodec==="vp9"?"libvpx-vp9":"libx264","-crf",manifest.profile.quality==="draft"?"28":manifest.profile.quality==="high"?"18":"23","-pix_fmt","yuv420p");
  if(audLabels.length)args.push("-c:a",manifest.profile.audioCodec==="opus"?"libopus":manifest.profile.audioCodec==="pcm"?"pcm_s16le":"aac","-ar",String(manifest.profile.audioSampleRate));
  if(manifest.profile.container!=="webm")args.push("-movflags","+faststart");
- args.push("-progress","pipe:1","-nostats","-y",outputPath);
+ args.push("-progress","pipe:1","-nostats","-y","-f",manifest.profile.container,outputPath);
  return{args,expectedDurationMs:manifest.durationMs,subtitleSidecar:manifest.subtitleMode==="sidecar"?sidecarPath:undefined};
 }
 export function runFfmpeg(args:string[],progress?:(line:string)=>void,signal?:AbortSignal){
