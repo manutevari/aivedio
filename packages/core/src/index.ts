@@ -11,3 +11,4 @@ export * from "./media.js";
 export * from "./timeline.js";
 export * from "./editing.js";
 export * from "./creative-director.js";
+export * from './creative-director.js';
