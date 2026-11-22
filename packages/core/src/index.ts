@@ -6,3 +6,4 @@ export * from "./safety.js";
 export * from "./checkpoint.js";
 export * from "./intelligence.js";
 export * from "./flow-engine.js";
+export * from "./capabilities.js";
