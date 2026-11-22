@@ -2,7 +2,7 @@ import {requireDb} from "./db.js";
 import {getTimeline} from "./timeline.js";
 import {defaultRenderProfile,RenderManifest,validateRenderManifest} from "@aivedio/core";
 export async function createRenderJobFromTimeline(projectId:string,profile:any=defaultRenderProfile,options:any={}){
- const db=requireDb();const {tracks,clips}=await getTimeline(projectId);
+ const db=requireDb() as any;const {tracks,clips}=await getTimeline(projectId) as {tracks:any[];clips:any[]};
  const trackMap=new Map(tracks.map(t=>[t.id,t]));
  const assets=await db.query("SELECT id,storage_key,mime_type,status FROM media_assets WHERE project_id=$1 AND id=ANY($2::uuid[])",[projectId,[...new Set(clips.map(c=>c.assetId).filter(Boolean))]]);
  const assetMap=new Map(assets.rows.map(a=>[a.id,a]));
