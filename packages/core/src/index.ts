@@ -12,3 +12,4 @@ export * from "./timeline.js";
 export * from "./editing.js";
 export * from "./creative-director.js";
 export * from './creative-director.js';
+export * from './scriptwriting.js';
