@@ -1,4 +1,6 @@
 import Fastify from "fastify";
+import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
+
 import {enrichCreativePlan,listScriptPackages,getScriptPackage,reviewScriptPackage} from './scriptwriting.js';
 
 import {createPlan,listPlans,getPlan,updatePlan,approvePlan,createPlanRevision} from './creative-plans.js';
@@ -93,4 +95,10 @@ app.post('/v1/projects/:id/creative-plans/:planId/script-packages',async(request
 app.get('/v1/projects/:id/script-packages',async(request)=>{const q=request.query as {planId?:string};return listScriptPackages((request.params as {id:string}).id,q.planId)});
 app.get('/v1/projects/:id/script-packages/:packageId',async(request,reply)=>{const p=await getScriptPackage((request.params as {id:string;packageId:string}).id,(request.params as {packageId:string}).packageId);if(!p)return reply.status(404).send({error:'Package not found'});return p});
 app.post('/v1/projects/:id/script-packages/:packageId/review',async(request,reply)=>{try{const b=request.body as {decision:'approve'|'reject';reviewer:string;notes?:string};if(!['approve','reject'].includes(b?.decision))return reply.status(400).send({error:'decision must be approve or reject'});return await reviewScriptPackage((request.params as {id:string;packageId:string}).id,(request.params as {packageId:string}).packageId,b.decision,b.reviewer,b.notes)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post('/v1/projects/:id/assets/:assetId/analyze',async(request,reply)=>{try{return reply.status(202).send(await requestAssetAnalysis((request.params as {id:string;assetId:string}).id,(request.params as {assetId:string}).assetId,(request.body as any)?.kinds))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get('/v1/projects/:id/asset-analysis',async(request)=>{const q=request.query as {assetId?:string};return listAssetAnalysis((request.params as {id:string}).id,q.assetId)});
+app.get('/v1/projects/:id/asset-analysis/:jobId',async(request,reply)=>{const j=await getAssetAnalysis((request.params as {id:string;jobId:string}).id,(request.params as {jobId:string}).jobId);if(!j)return reply.status(404).send({error:'Analysis job not found'});return j});
+app.get('/v1/projects/:id/assets/:assetId/intelligence',async(request,reply)=>{try{return await getAssetIntelligence((request.params as {id:string;assetId:string}).id,(request.params as {assetId:string}).assetId)}catch(e){return reply.status(404).send({error:e instanceof Error?e.message:String(e)})}});
+app.get('/v1/projects/:id/assets/:assetId/keyframes',async(request)=>listKeyframes((request.params as {id:string;assetId:string}).id,(request.params as {assetId:string}).assetId));
+app.get('/v1/projects/:id/media-search',async(request)=>{const q=request.query as {q?:string;limit?:string};return searchMediaChunks((request.params as {id:string}).id,q.q??'',Number(q.limit)||10)});
 const port=Number(process.env.PORT??3000);await app.listen({port,host:"0.0.0.0"});
