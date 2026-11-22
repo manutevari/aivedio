@@ -16,7 +16,7 @@ async function claim(){
  const u=await c.query("UPDATE render_jobs SET status='validating',attempt=attempt+1,lease_owner=$2,lease_expires_at=now()+interval '20 minutes',stage='validating',error=NULL,updated_at=now() WHERE id=$1 RETURNING *",[j.id,workerId]);await c.query("COMMIT");return u.rows[0];
  }catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}}
 async function checkpoint(id:string,stage:string,progress:number,data:Record<string,unknown>={}){
- await pool.query("UPDATE render_jobs SET stage=$2,progress=$3,checkpoint=checkpoint||$4::jsonb,lease_expires_at=now()+interval '20 minutes',updated_at=now() WHERE id=$1 AND lease_owner=$5",[id,stage,progress,JSON.stringify({stage,at:new Date().toISOString(),...data}),workerId]);
+ await pool.query("UPDATE render_jobs SET stage=$2,status=CASE WHEN $2='rendering' THEN 'rendering' ELSE status END,progress=$3,checkpoint=checkpoint||$4::jsonb,lease_expires_at=now()+interval '20 minutes',updated_at=now() WHERE id=$1 AND lease_owner=$5",[id,stage,progress,JSON.stringify({stage,at:new Date().toISOString(),...data}),workerId]);
 }
 async function run(j:any){
  const root=path.resolve(process.env.MEDIA_ROOT??"./media"),outRoot=path.resolve(process.env.RENDER_OUTPUT_ROOT??"./renders");
@@ -30,7 +30,7 @@ async function run(j:any){
  if(manifest.subtitleMode!=="none"&&manifest.subtitles.length)await fs.writeFile(subPath,srt(manifest),"utf8");
  const compiled=compileRender(manifest,paths,temp,manifest.subtitleMode==="burn_in"?subPath:undefined);
  await checkpoint(j.id,"ffmpeg",0.03,{manifestHash:crypto.createHash("sha256").update(JSON.stringify(manifest)).digest("hex")});
- await runFfmpeg(compiled.args,line=>{const m=line.match(/out_time_ms=(\d+)/);if(m){const progress=Math.min(.9,0.05+Number(m[1])/1000000/Math.max(.001,manifest.durationMs/1000)*.85);void checkpoint(j.id,"rendering",progress)}});
+ await runFfmpeg(compiled.args,line=>{const m=line.match(/out_time_ms=(\d+)/);if(m){const progress=Math.min(.9,0.05+Number(m[1])/1000000/Math.max(.001,manifest.durationMs/1000)*.85);void checkpoint(j.id,"rendering",progress).catch(e=>console.error("Progress checkpoint failed",e))}});
  const probe=await probeOutput(temp);const format=probe.format??{};const streams=probe.streams??[];const video=streams.find((s:any)=>s.codec_type==="video"),audio=streams.find((s:any)=>s.codec_type==="audio");
  const actualDuration=Number(format.duration??video?.duration??0)*1000;
  const findings:any[]=[];
