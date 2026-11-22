@@ -93,7 +93,7 @@ export async function getTimelineEditManifest(projectId:string){
   if(clip.transitionIn){const allowed=["cut","fade","dissolve","wipeleft","wiperight","slideleft","slideright"];const type=allowed.includes(clip.transitionIn)?clip.transitionIn:"cut";transitions[clip.id]={type:type as any,durationMs:type==="cut"?0:Number((clip.metadata as any)?.transitionInDurationMs??500)}}
  }
  const manifest=dbToEditManifest(projectId,defaultRenderProfile,tracks,clips,transitions,subtitles);
- manifest.audioMix=settings.map((s:any)=>({trackId:s.track_id,gainDb:Number(s.gain_db),muted:Boolean(s.muted),ducking:s.ducking??undefined}));
+ manifest.audioMix=settings.map((s:any)=>({trackId:s.track_id,gainDb:Number(s.gain_db),muted:Boolean(s.muted),...(s.ducking?{ducking:s.ducking}:{})}));
  const validation=validateEditManifest(manifest);
  return{manifest,validation,sourceCounts:{tracks:tracks.length,clips:clips.length,subtitles:subtitles.length},renderReady:validation.valid};
 }
