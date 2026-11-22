@@ -10,6 +10,8 @@ import {listProviders,upsertProvider,routeRequest,createGenerationJob,getGenerat
 import {discoveryCandidate,registerDiscoveredProvider,getDiscoveredProviders} from "./mcp-registry.js";
 import {listGenerationJobs,reviewGenerationJob,listProjectAssets,listProjectAssetsGlobal,reviewAsset} from "./reviews.js";
 import {parseReview} from "./validation.js";
+import {getTimeline,createTrack,updateTrack,createClip,updateClip,deleteClip,splitClip,trimClip,createRenderJob,listRenderJobs,getRenderJob,transitionRenderJob} from "./timeline.js";
+
 const app=Fastify({logger:true});
 app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-6",database:pool?"configured":"not_configured"}));
 app.get("/ready",async(_r,reply)=>{try{if(!pool)return reply.status(503).send({ready:false,reason:"DATABASE_URL missing"});await pool.query("SELECT 1");return {ready:true};}catch{return reply.status(503).send({ready:false,reason:"database unavailable"});}});
@@ -37,6 +39,18 @@ app.get("/v1/assets",async(request)=>{const q=request.query as {projectId?:strin
 app.post("/v1/assets/:id/review",async(request,reply)=>{try{return await reviewAsset((request.params as {id:string}).id,parseReview(request.body))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/generation-jobs/:id",async(request)=>getGenerationJob((request.params as {id:string}).id));
 app.post("/v1/generation-jobs/:id/transition",async(request,reply)=>{try{return await transitionGenerationJob((request.params as {id:string}).id,(request.body as any).status,(request.body as any).result,(request.body as any).error)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/timeline",async(request)=>getTimeline((request.params as {id:string}).id));
+app.post("/v1/projects/:id/timeline/tracks",async(request,reply)=>{const body=request.body as {name:string;kind:string;order?:number};if(!body?.name||!body.kind)return reply.status(400).send({error:"name and kind required"});return reply.status(201).send(await createTrack((request.params as {id:string}).id,body))});
+app.patch("/v1/timeline/tracks/:id",async(request,reply)=>{const r=await updateTrack((request.params as {id:string}).id,request.body as any);if(!r)return reply.status(404).send({error:"Track not found"});return r});
+app.post("/v1/timeline/tracks/:id/clips",async(request,reply)=>{try{return reply.status(201).send(await createClip((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.patch("/v1/timeline/clips/:id",async(request,reply)=>{try{const r=await updateClip((request.params as {id:string}).id,request.body as any);if(!r)return reply.status(404).send({error:"Clip not found"});return r}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.delete("/v1/timeline/clips/:id",async(request,reply)=>{if(!await deleteClip((request.params as {id:string}).id))return reply.status(404).send({error:"Clip not found"});return {deleted:true}});
+app.post("/v1/timeline/clips/:id/split",async(request,reply)=>{try{return await splitClip((request.params as {id:string}).id,(request.body as {offsetMs:number}).offsetMs)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/timeline/clips/:id/trim",async(request,reply)=>{try{return await trimClip((request.params as {id:string}).id,(request.body as {startMs:number;endMs:number}).startMs,(request.body as {startMs:number;endMs:number}).endMs)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/render-jobs",async(request,reply)=>{try{const body=request.body as {profile?:any;options?:Record<string,unknown>};return reply.status(201).send(await createRenderJob((request.params as {id:string}).id,body.profile,body.options))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/render-jobs",async(request)=>listRenderJobs((request.params as {id:string}).id));
+app.get("/v1/render-jobs/:id",async(request)=>getRenderJob((request.params as {id:string}).id));
+app.post("/v1/render-jobs/:id/transition",async(request,reply)=>{try{const b=request.body as {status:any;progress?:number;error?:string};return await transitionRenderJob((request.params as {id:string}).id,b.status,b.progress,b.error)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects",async()=>listProjects());
 app.post("/v1/projects",async(request,reply)=>{const body=request.body as {title:string;mode?:string;target?:unknown;creativeBrief?:string};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});return reply.status(201).send(await createProject(body));});
 app.get("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await getProject(id);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
