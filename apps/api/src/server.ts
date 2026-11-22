@@ -10,6 +10,15 @@ import {listProviders,upsertProvider,routeRequest,createGenerationJob,getGenerat
 import {discoveryCandidate,registerDiscoveredProvider,getDiscoveredProviders} from "./mcp-registry.js";
 import {listGenerationJobs,reviewGenerationJob,listProjectAssets,listProjectAssetsGlobal,reviewAsset} from "./reviews.js";
 import {parseReview} from "./validation.js";
+import {listEditDecisions,saveEditDecision,listSubtitles,upsertSubtitle,deleteSubtitle,getMixSettings,saveMixSetting} from "./editing.js";
+app.get("/v1/projects/:id/edit-decisions",async(request)=>listEditDecisions((request.params as {id:string}).id));
+app.post("/v1/projects/:id/edit-decisions",async(request,reply)=>{try{return reply.status(201).send(await saveEditDecision((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/subtitles",async(request)=>listSubtitles((request.params as {id:string}).id));
+app.post("/v1/projects/:id/subtitles",async(request,reply)=>{try{return reply.status(201).send(await upsertSubtitle((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.delete("/v1/subtitles/:id",async(request,reply)=>{if(!await deleteSubtitle((request.params as {id:string}).id))return reply.status(404).send({error:"Subtitle not found"});return {deleted:true}});
+app.get("/v1/projects/:id/audio-mix",async(request)=>getMixSettings((request.params as {id:string}).id));
+app.put("/v1/projects/:id/audio-mix",async(request,reply)=>{try{return reply.status(200).send(await saveMixSetting((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+
 import {getTimeline,createTrack,updateTrack,createClip,updateClip,deleteClip,splitClip,trimClip,createRenderJob,listRenderJobs,getRenderJob,transitionRenderJob} from "./timeline.js";
 
 const app=Fastify({logger:true});
