@@ -72,9 +72,9 @@ export async function applyProductionCut(projectId:string,id:string){
   const track=(await client.query("INSERT INTO timeline_tracks(project_id,name,kind,track_order,metadata) VALUES($1,$2,'video',$3,$4) RETURNING *",[projectId,"Main Video — Cut v"+cut.version,maxOrder,{productionCutId:id,version:cut.version,nonDestructive:true}])).rows[0];
   const clipIds:string[]=[];
   for(const item of content.items){
-   const kind=item.assetKind==="image"?"image":"video";
+   const kind="video";
    const result=await client.query(`INSERT INTO timeline_clips(track_id,asset_id,kind,title,timeline_start_ms,timeline_duration_ms,source_start_ms,source_duration_ms,playback_rate,volume,opacity,z_index,metadata)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,1,1,1,$9,$10) RETURNING id`,[track.id,item.assetId,kind,item.title,item.timelineStartMs,item.timelineDurationMs,item.sourceStartMs,item.timelineDurationMs,item.shotOrder,JSON.stringify({productionCutId:id,planId:cut.plan_id,scriptPackageId:cut.script_package_id,sceneId:item.sceneId,shotId:item.shotId,prompt:item.prompt,negativePrompt:item.negativePrompt,qaGated:true})]);
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,1,1,1,$9,$10) RETURNING id`,[track.id,item.assetId,kind,item.title,item.timelineStartMs,item.timelineDurationMs,item.sourceStartMs,item.timelineDurationMs,item.shotOrder,JSON.stringify({productionCutId:id,planId:cut.plan_id,scriptPackageId:cut.script_package_id,sceneId:item.sceneId,shotId:item.shotId,sourceAssetKind:item.assetKind,prompt:item.prompt,negativePrompt:item.negativePrompt,qaGated:true})]);
    clipIds.push(result.rows[0].id);
   }
   const updatedContent={...content,appliedTrackId:track.id,appliedClipIds:clipIds};
