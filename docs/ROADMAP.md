@@ -154,3 +154,19 @@
 - [x] Responsive styles for mobile widths
 - [x] Streamlit workspace extended to cover the same production pipeline
 - [ ] Interactive drag-and-drop timeline editing, actual media preview, upload UI, character CRUD forms, API authentication/role-based reviewer identity, complete endpoint validation and automated UI tests
+
+## Phase 18 — Integration & Release Readiness
+- [x] Repair escaped source line-break defects found during CI
+- [x] Remove direct API render-state transition endpoint
+- [x] Add optional bearer-token API protection and production fail-closed token requirement
+- [x] Add CORS allowlist and preflight handling
+- [x] Include audio clips in render duration calculation
+- [x] Harden render worker path resolution against symlink escape
+- [x] Recover expired/missing render leases
+- [x] Add GitHub Actions CI workflow (typecheck, build, Python syntax)
+- [ ] CI green and all type/build errors resolved
+- [ ] Secure user/session authentication and role-based review authorization
+- [ ] API ownership/authorization audit
+- [ ] E2E tests for project-to-delivery workflow
+- [ ] Migration rehearsal and worker/render integration tests
+- [ ] Release deployment and rollback plan
