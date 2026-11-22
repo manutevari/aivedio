@@ -69,7 +69,7 @@ export function buildAudioProductionPlan(input:{
    if(!withinScene)reasons.push("ESTIMATED_DIALOGUE_EXCEEDS_SCENE");
    if(!asset)reasons.push("VOICE_GENERATION_OR_RECORDING_REQUIRED");
    if(asset&&asset.durationSeconds!==undefined&&asset.durationSeconds!==null&&asset.durationSeconds*1000+100<durationMs)reasons.push("SOURCE_TOO_SHORT");
-   add({id,kind:line.kind==="narration"?"narration":"dialogue",sceneId:scene.id,sceneOrder:scene.order,title:line.speaker||"Narration",text:line.line,speaker:line.speaker,startMs,durationMs,timingConfidence:"estimated",assetId:asset?.id??null,assetState:!asset?"needs_asset":reasons.length?"needs_review":"ready",readinessReasons:reasons,gainDb:0,fadeInMs:0,fadeOutMs:80,duckingTarget:"none",sourceStartMs:0,sourceDurationMs:asset?.durationSeconds?Math.round(asset.durationSeconds*1000):null,metadata:{estimatedWordsPerMinute:150,source:"approved_script",requiresSyncReview:true}});
+   add({id,kind:line.kind==="narration"?"narration":"dialogue",sceneId:scene.id,sceneOrder:scene.order,title:line.speaker||"Narration",text:line.line,speaker:line.speaker,startMs,durationMs,timingConfidence:"estimated",assetId:asset?.id??null,assetState:!asset?"needs_asset":reasons.length||line.kind!=="dialogue"?"needs_review":"ready",readinessReasons:reasons,gainDb:0,fadeInMs:0,fadeOutMs:80,duckingTarget:"none",sourceStartMs:0,sourceDurationMs:asset?.durationSeconds?Math.round(asset.durationSeconds*1000):null,metadata:{estimatedWordsPerMinute:150,source:"approved_script",requiresSyncReview:true}});
    dialogueOffset+=durationMs;
   }
   if(scene.music?.direction){
@@ -77,7 +77,7 @@ export function buildAudioProductionPlan(input:{
    const reasons=asset?audioAssetReasons(asset):["MUSIC_ASSET_NOT_ASSIGNED"];
    if(!asset)reasons.push("MUSIC_SELECTION_REQUIRED");
    if(asset?.durationSeconds&&asset.durationSeconds*1000+100<scene.durationMs)reasons.push("SOURCE_TOO_SHORT");
-   add({id,kind:"music",sceneId:scene.id,sceneOrder:scene.order,title:scene.music.direction,startMs:scene.startMs,durationMs:scene.durationMs,timingConfidence:"estimated",assetId:asset?.id??null,assetState:!asset?"needs_asset":reasons.length?"needs_review":"ready",readinessReasons:reasons,gainDb:-18,fadeInMs:500,fadeOutMs:800,duckingTarget:"dialogue",sourceStartMs:0,sourceDurationMs:asset?.durationSeconds?Math.round(asset.durationSeconds*1000):null,metadata:{intensity:scene.music.intensity,direction:scene.music.direction,requiresHumanAudition:true}});
+   add({id,kind:"music",sceneId:scene.id,sceneOrder:scene.order,title:scene.music.direction,startMs:scene.startMs,durationMs:scene.durationMs,timingConfidence:"estimated",assetId:asset?.id??null,assetState:!asset?"needs_asset":reasons.length?"needs_review":"needs_review",readinessReasons:reasons,gainDb:-18,fadeInMs:500,fadeOutMs:800,duckingTarget:"dialogue",sourceStartMs:0,sourceDurationMs:asset?.durationSeconds?Math.round(asset.durationSeconds*1000):null,metadata:{intensity:scene.music.intensity,direction:scene.music.direction,requiresHumanAudition:true}});
   }
   if(scene.ambience){
    const id="amb_"+scene.id;const assetId=input.assetAssignments?.[id]??null;const asset=assetId?input.candidates.find(a=>a.id===assetId):undefined;
