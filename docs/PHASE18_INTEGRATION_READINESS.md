@@ -25,13 +25,13 @@ This phase is a source-level hardening and CI setup. It does not deploy, apply m
 
 ## Verification
 - Source was inspected and modified through GitHub branch operations.
-- The CI workflow is added but its run result is pending.
-- No local pnpm install/build/typecheck was run in this chat environment.
+- GitHub Actions CI passed on the implementation commit: TypeScript typecheck, build, Python syntax check, and Streamlit requirements dry-run.
+- CI ran the workspace pnpm install, typecheck and build, Python compile check, and Streamlit dependency dry-run.
 - No database migration was applied.
 - No production deployment was made.
 
 ## Remaining release blockers
-1. CI run must pass and errors be fixed.
+1. CI has passed for the current implementation; repeat after any further code changes.
 2. Auth/session model and role-based reviewer permissions; reviewer name supplied by UI is not proof of identity.
 3. API project/asset ownership authorization and endpoint validation review.
 4. Migration runner and migration execution rehearsal on a disposable database.
@@ -43,4 +43,4 @@ This phase is a source-level hardening and CI setup. It does not deploy, apply m
 10. Release deployment, environment validation, monitoring and rollback plan.
 
 ## Release decision
-**NOT RELEASE READY.** The branch is now better protected and CI has been introduced, but the actual CI run and integration/security test suite are still required before deployment.
+**NOT RELEASE READY.** CI now passes for the implementation commit, but E2E/security integration testing, authentication/session roles, migration rehearsal, and render-worker tests remain required before deployment.
