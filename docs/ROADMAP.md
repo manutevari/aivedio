@@ -114,3 +114,14 @@
 - [x] Non-destructive apply to a new video timeline track with shot metadata
 - [x] Timeline edit manifest API integrating clips, tracks, subtitles, transitions and audio-mix settings
 - [ ] UI/Flow workspace integration, automatic subtitle cue creation, render-worker integration, integration tests and auth/RBAC
+
+## Phase 15 — Audio Intelligence & Sound Design
+- [x] Structured audio cues: dialogue, narration, music, ambience and SFX
+- [x] Script music arc and sound-design extraction into versioned audio plans
+- [x] Explicit missing assets and estimated/unconfirmed timing states
+- [x] Audio plan cue editing with project-bound asset and release/QA/safety checks
+- [x] Human approval requiring reviewed timing and cleared audio assets
+- [x] Audio plan application to separate timeline tracks with per-cue gain metadata and mix settings
+- [x] Audio QA queue, reports and worker using FFmpeg/FFprobe loudness, peak, clipping and silence analysis
+- [x] Configurable ducking contracts and API
+- [ ] Sidechain ducking in render graph, voice generation/recording adapters, music/SFX search, lip-sync measurement, UI and integration tests
