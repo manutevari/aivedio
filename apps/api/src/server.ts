@@ -1,11 +1,9 @@
 import Fastify from "fastify";
+import {timingSafeEqual} from "node:crypto";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
 import {createAssetQualityJob,listQualityJobs,listQualityReports,getQualityReport,runContinuityReview,applySafetyReview,listSafetyReviews} from './quality.js';
-
 import {enrichCreativePlan,listScriptPackages,getScriptPackage,reviewScriptPackage} from './scriptwriting.js';
-
 import {createPlan,listPlans,getPlan,updatePlan,approvePlan,createPlanRevision} from './creative-plans.js';
-
 import { classifyNode, decideNextAction, analyzeCreativeBrief, optimizeContext, buildProductionGraph, continuityChecklist, routeCapability } from "@aivedio/core";
 import {pool,requireDb} from "./db.js";
 import {listProjects,createProject,getProject,updateProject,listScenes,createScene,updateScene,deleteScene} from "./projects.js";
@@ -18,7 +16,34 @@ import {discoveryCandidate,registerDiscoveredProvider,getDiscoveredProviders} fr
 import {listGenerationJobs,reviewGenerationJob,listProjectAssets,listProjectAssetsGlobal,reviewAsset} from "./reviews.js";
 import {parseReview} from "./validation.js";
 import {listEditDecisions,saveEditDecision,listSubtitles,upsertSubtitle,deleteSubtitle,getMixSettings,saveMixSetting} from "./editing.js";
+import {getTimeline,createTrack,updateTrack,createClip,updateClip,deleteClip,splitClip,trimClip,createRenderJob,listRenderJobs,getRenderJob} from "./timeline.js";
+import {createProductionCut,listProductionCuts,getProductionCut,applyProductionCut,getTimelineEditManifest} from "./production-cuts.js";
+import {createAudioPlan,listAudioPlans,getAudioPlan,updateAudioCue,reviewAudioPlan,applyAudioPlan,requestAudioAnalysis,listAudioAnalysis,listAudioAnalysisJobs,getAudioAnalysis,saveDucking} from "./audio-intelligence.js";
+import {createRenderJobFromTimeline} from "./rendering.js";
+import {reviewRenderJob} from "./timeline.js";
+
+
+
 const app=Fastify({logger:true});
+const apiToken=process.env.AIVEDIO_API_TOKEN;
+if(process.env.NODE_ENV==="production"&&!apiToken)throw new Error("AIVEDIO_API_TOKEN must be configured in production");
+const allowedOrigins=(process.env.AIVEDIO_ALLOWED_ORIGINS??"http://localhost:5173,http://localhost:8501").split(",").map(x=>x.trim()).filter(Boolean);
+app.addHook("onRequest",async(request,reply)=>{
+ const origin=request.headers.origin;
+ if(origin&&allowedOrigins.includes(origin)){
+  reply.header("Access-Control-Allow-Origin",origin);
+  reply.header("Vary","Origin");
+  reply.header("Access-Control-Allow-Headers","Authorization,Content-Type");
+  reply.header("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");
+ }
+ if(request.method==="OPTIONS")return reply.code(204).send();
+ if(request.url==="/health")return;
+ if(apiToken){
+  const received=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
+  const a=Buffer.from(received),b=Buffer.from(apiToken);
+  if(a.length!==b.length||!timingSafeEqual(a,b))return reply.code(401).send({error:"Unauthorized"});
+ }
+});
 app.post("/v1/projects/:id/production-cuts/:cutId/audio-plans",async(request,reply)=>{try{const p=request.params as {id:string;cutId:string};const b=request.body as {assetAssignments?:Record<string,string>;createdBy?:string};return reply.status(201).send(await createAudioPlan(p.id,p.cutId,b?.assetAssignments??{},b?.createdBy))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/audio-plans",async(request)=>listAudioPlans((request.params as {id:string}).id));
 app.get("/v1/projects/:id/audio-plans/:planId",async(request,reply)=>{const p=request.params as {id:string;planId:string};const r=await getAudioPlan(p.id,p.planId);if(!r)return reply.status(404).send({error:"Audio plan not found"});return r});
@@ -50,11 +75,6 @@ app.delete("/v1/subtitles/:id",async(request,reply)=>{if(!await deleteSubtitle((
 app.get("/v1/projects/:id/audio-mix",async(request)=>getMixSettings((request.params as {id:string}).id));
 app.put("/v1/projects/:id/audio-mix",async(request,reply)=>{try{return reply.status(200).send(await saveMixSetting((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 
-import {getTimeline,createTrack,updateTrack,createClip,updateClip,deleteClip,splitClip,trimClip,createRenderJob,listRenderJobs,getRenderJob,transitionRenderJob} from "./timeline.js";
-import {createProductionCut,listProductionCuts,getProductionCut,applyProductionCut,getTimelineEditManifest} from "./production-cuts.js";
-import {createAudioPlan,listAudioPlans,getAudioPlan,updateAudioCue,reviewAudioPlan,applyAudioPlan,requestAudioAnalysis,listAudioAnalysis,listAudioAnalysisJobs,getAudioAnalysis,saveDucking} from "./audio-intelligence.js";
-import {createRenderJobFromTimeline} from "./rendering.js";
-import {reviewRenderJob} from "./timeline.js";
 
 
 app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-6",database:pool?"configured":"not_configured"}));
@@ -95,7 +115,7 @@ app.post("/v1/projects/:id/render-jobs",async(request,reply)=>{try{const body=re
 app.post("/v1/render-jobs/:id/review",async(request,reply)=>{try{const b=request.body as {decision:"approve"|"reject";reviewer:string;notes?:string};if(!["approve","reject"].includes(b?.decision))return reply.status(400).send({error:"decision must be approve or reject"});return await reviewRenderJob((request.params as {id:string}).id,b.decision,b.reviewer,b.notes)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/render-jobs",async(request)=>listRenderJobs((request.params as {id:string}).id));
 app.get("/v1/render-jobs/:id",async(request)=>getRenderJob((request.params as {id:string}).id));
-app.post("/v1/render-jobs/:id/transition",async(request,reply)=>{try{const b=request.body as {status:any;progress?:number;error?:string};return await transitionRenderJob((request.params as {id:string}).id,b.status,b.progress,b.error)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+
 app.get("/v1/projects",async()=>listProjects());
 app.post("/v1/projects",async(request,reply)=>{const body=request.body as {title:string;mode?:string;target?:unknown;creativeBrief?:string};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});return reply.status(201).send(await createProject(body));});
 app.get("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await getProject(id);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
