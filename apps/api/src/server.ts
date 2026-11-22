@@ -9,7 +9,7 @@ import {createCharacter,listCharacters,createReference,listReferences,replaceFlo
 import {listProviders,upsertProvider,routeRequest,createGenerationJob,getGenerationJob,transitionGenerationJob} from "./providers.js";
 import {discoveryCandidate,registerDiscoveredProvider,getDiscoveredProviders} from "./mcp-registry.js";
 const app=Fastify({logger:true});
-app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-5",database:pool?"configured":"not_configured"}));
+app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-6",database:pool?"configured":"not_configured"}));
 app.get("/ready",async(_r,reply)=>{try{if(!pool)return reply.status(503).send({ready:false,reason:"DATABASE_URL missing"});await pool.query("SELECT 1");return {ready:true};}catch{return reply.status(503).send({ready:false,reason:"database unavailable"});}});
 app.post("/v1/workflow/classify",async(request)=>{const body=request.body as {type:string;risk?:"low"|"medium"|"high"|"critical"};return classifyNode(body.type,body.risk??"low");});
 app.post("/v1/decision/evaluate",async(request)=>decideNextAction(request.body as Parameters<typeof decideNextAction>[0]));
@@ -24,7 +24,7 @@ app.get("/v1/models/openrouter",async()=>getFreeModels());
 app.get("/v1/models/openrouter/all",async()=>discoverOpenRouterModels());
 app.post("/v1/models/route",async(request)=>{const body=request.body as {task?:string};const models=await getFreeModels();return {task:body.task??"llm",model:routeFreeLLM(models,(body.task??"llm") as any)??null,freeOnly:true};});
 app.get("/v1/providers",async()=>listProviders());
-app.post("/v1/providers",async(request,reply)=>{try{return reply.status(201).send(await upsertProvider(request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)}}});
+app.post("/v1/providers",async(request,reply)=>{try{return reply.status(201).send(await upsertProvider(request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.post("/v1/providers/route",async(request)=>routeRequest(request.body as any));
 app.post("/v1/providers/discovery-candidates",async(request)=>{const p=discoveryCandidate(request.body as any);registerDiscoveredProvider(p);return p});
 app.get("/v1/providers/discovered",async()=>getDiscoveredProviders());
