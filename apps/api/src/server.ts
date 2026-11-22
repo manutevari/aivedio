@@ -19,6 +19,11 @@ import {listGenerationJobs,reviewGenerationJob,listProjectAssets,listProjectAsse
 import {parseReview} from "./validation.js";
 import {listEditDecisions,saveEditDecision,listSubtitles,upsertSubtitle,deleteSubtitle,getMixSettings,saveMixSetting} from "./editing.js";
 const app=Fastify({logger:true});
+app.post("/v1/projects/:id/production-cuts",async(request,reply)=>{try{const p=request.params as {id:string};const b=request.body as {scriptPackageId:string;assetAssignments?:Record<string,string>;createdBy?:string};return reply.status(201).send(await createProductionCut(p.id,b))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/production-cuts",async(request)=>listProductionCuts((request.params as {id:string}).id));
+app.get("/v1/projects/:id/production-cuts/:cutId",async(request,reply)=>{const p=request.params as {id:string;cutId:string};const r=await getProductionCut(p.id,p.cutId);if(!r)return reply.status(404).send({error:"Production cut not found"});return r});
+app.post("/v1/projects/:id/production-cuts/:cutId/apply",async(request,reply)=>{try{const p=request.params as {id:string;cutId:string};return await applyProductionCut(p.id,p.cutId)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/timeline/manifest",async(request)=>getTimelineEditManifest((request.params as {id:string}).id));
 app.post("/v1/projects/:id/quality/assets/:assetId/jobs",async(request,reply)=>{try{const p=request.params as {id:string;assetId:string};const b=request.body as {expectedProfile?:Record<string,unknown>;requestedBy?:string};return reply.status(201).send(await createAssetQualityJob(p.id,p.assetId,b?.expectedProfile??{},b?.requestedBy))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/quality/jobs",async(request)=>listQualityJobs((request.params as {id:string}).id));
 app.get("/v1/projects/:id/quality/reports",async(request)=>{const p=request.params as {id:string};const q=request.query as {assetId?:string};return listQualityReports(p.id,q.assetId)});
@@ -35,6 +40,7 @@ app.get("/v1/projects/:id/audio-mix",async(request)=>getMixSettings((request.par
 app.put("/v1/projects/:id/audio-mix",async(request,reply)=>{try{return reply.status(200).send(await saveMixSetting((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 
 import {getTimeline,createTrack,updateTrack,createClip,updateClip,deleteClip,splitClip,trimClip,createRenderJob,listRenderJobs,getRenderJob,transitionRenderJob} from "./timeline.js";
+import {createProductionCut,listProductionCuts,getProductionCut,applyProductionCut,getTimelineEditManifest} from "./production-cuts.js";
 
 
 app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-6",database:pool?"configured":"not_configured"}));
