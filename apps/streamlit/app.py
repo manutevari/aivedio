@@ -7,7 +7,7 @@ st.set_page_config(page_title="AIVEDIO Studio",page_icon="🎬",layout="wide")
 st.markdown("""<style>.stApp{background:#080b14;color:#e7eaf5}[data-testid=stSidebar]{background:#0b0f1a}div[data-testid=stMetric]{background:#111827;border:1px solid #273149;padding:12px;border-radius:12px}</style>""",unsafe_allow_html=True)
 
 def api(path,method="GET",data=None):
-    response=requests.request(method,API+path,json=data,timeout=20)
+    headers={"Authorization":"Bearer "+os.getenv("AIVEDIO_API_TOKEN")} if os.getenv("AIVEDIO_API_TOKEN") else {}\n    response=requests.request(method,API+path,json=data,headers=headers,timeout=20)
     response.raise_for_status()
     return response.json() if response.content else None
 
