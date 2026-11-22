@@ -17,6 +17,7 @@ import {discoveryCandidate,registerDiscoveredProvider,getDiscoveredProviders} fr
 import {listGenerationJobs,reviewGenerationJob,listProjectAssets,listProjectAssetsGlobal,reviewAsset} from "./reviews.js";
 import {parseReview} from "./validation.js";
 import {listEditDecisions,saveEditDecision,listSubtitles,upsertSubtitle,deleteSubtitle,getMixSettings,saveMixSetting} from "./editing.js";
+const app=Fastify({logger:true});
 app.get("/v1/projects/:id/edit-decisions",async(request)=>listEditDecisions((request.params as {id:string}).id));
 app.post("/v1/projects/:id/edit-decisions",async(request,reply)=>{try{return reply.status(201).send(await saveEditDecision((request.params as {id:string}).id,request.body as any))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/subtitles",async(request)=>listSubtitles((request.params as {id:string}).id));
@@ -27,7 +28,7 @@ app.put("/v1/projects/:id/audio-mix",async(request,reply)=>{try{return reply.sta
 
 import {getTimeline,createTrack,updateTrack,createClip,updateClip,deleteClip,splitClip,trimClip,createRenderJob,listRenderJobs,getRenderJob,transitionRenderJob} from "./timeline.js";
 
-const app=Fastify({logger:true});
+
 app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-6",database:pool?"configured":"not_configured"}));
 app.get("/ready",async(_r,reply)=>{try{if(!pool)return reply.status(503).send({ready:false,reason:"DATABASE_URL missing"});await pool.query("SELECT 1");return {ready:true};}catch{return reply.status(503).send({ready:false,reason:"database unavailable"});}});
 app.post("/v1/workflow/classify",async(request)=>{const body=request.body as {type:string;risk?:"low"|"medium"|"high"|"critical"};return classifyNode(body.type,body.risk??"low");});
