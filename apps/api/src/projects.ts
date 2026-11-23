@@ -1,8 +1,10 @@
 import {requireDb} from "./db.js";
 import type {AuthUser} from "./auth.js";
 export async function listProjects(user:AuthUser){if(user.global_role==="admin")return(await requireDb().query("SELECT * FROM projects ORDER BY updated_at DESC")).rows;return(await requireDb().query("SELECT p.* FROM projects p JOIN project_members pm ON pm.project_id=p.id WHERE pm.user_id=$1 ORDER BY p.updated_at DESC",[user.id])).rows;}
-export async function createProject(input:{title:string;mode?:string;target?:unknown;creativeBrief?:string}){
- return (await requireDb()!.query("INSERT INTO projects(title,mode,target,creative_brief) VALUES($1,$2,$3,$4) RETURNING *",[input.title,input.mode??"flow",input.target??{},input.creativeBrief??null])).rows[0];
+export async function createProject(input:{title:string;mode?:string;target?:unknown;creativeBrief?:string},ownerId?:string){
+ if(!ownerId)return(await requireDb().query("INSERT INTO projects(title,mode,target,creative_brief) VALUES($1,$2,$3,$4) RETURNING *",[input.title,input.mode??"flow",input.target??{},input.creativeBrief??null])).rows[0];
+ const client=await requireDb().connect();
+ try{await client.query("BEGIN");const project=(await client.query("INSERT INTO projects(title,mode,target,creative_brief,owner_user_id) VALUES($1,$2,$3,$4,$5) RETURNING *",[input.title,input.mode??"flow",input.target??{},input.creativeBrief??null,ownerId])).rows[0];await client.query("INSERT INTO project_members(project_id,user_id,role) VALUES($1,$2,$3)",[project.id,ownerId,"owner"]);await client.query("COMMIT");return project}catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}
 }
 export async function getProject(id:string){return (await requireDb()!.query("SELECT * FROM projects WHERE id=$1",[id])).rows[0]??null;}
 export async function updateProject(id:string,input:Record<string,unknown>){
