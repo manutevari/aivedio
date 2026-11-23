@@ -167,7 +167,7 @@
 - [x] CI green: typecheck and build (previous workflow); Python syntax and dependency dry-run pending re-verification with database E2E
 - [ ] Secure user/session authentication and role-based review authorization
 - [ ] API ownership/authorization audit
-- [x] Deterministic API E2E smoke: project → plan → script review → QA/safety-gated fixture assets → production cut → timeline → audio HITL gate → render snapshot → delivery review\n- [ ] Real provider generation and FFmpeg worker integration tests
+- [ ] Deterministic API E2E smoke: project → plan → script review → QA/safety-gated fixture assets → production cut → timeline → audio HITL gate → render snapshot → delivery review (CI still validating fixture integration)\n- [ ] Real provider generation and FFmpeg worker integration tests
 - [ ] Migration rehearsal and worker/render integration tests
 - [ ] Release deployment and rollback plan
 
