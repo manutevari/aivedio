@@ -165,8 +165,8 @@
 - [x] Recover expired/missing render leases
 - [x] Add GitHub Actions CI workflow (typecheck, build, Python syntax)
 - [x] CI green: typecheck and build (previous workflow); Python syntax and dependency dry-run pending re-verification with database E2E
-- [ ] Secure user/session authentication and role-based review authorization
-- [ ] API ownership/authorization audit
+- [x] Secure user/session authentication and role-based review authorization (Phase 21 implementation)
+- [ ] Full API ownership/authorization audit (remaining resource and global endpoints)
 - [x] Deterministic API E2E smoke: project → plan → script review → QA/safety-gated fixture assets → production cut → timeline → audio HITL gate → render snapshot → delivery review (CI passed on commit 3602cf5)\n- [ ] Real provider generation and FFmpeg worker integration tests
 - [ ] Migration rehearsal and worker/render integration tests
 - [ ] Release deployment and rollback plan
@@ -185,14 +185,14 @@
 - [ ] Authentication/RBAC and project ownership authorization audit
 
 ## Phase 20 — Production Security Configuration Guardrails
-- [x] Fail-closed production API token requirement
-- [x] Require a 32-character minimum production bearer token
+- [x] Fail-closed production session-secret requirement
+- [x] Require a 32-character minimum production session secret
 - [x] Require explicit production CORS origins; reject wildcard, localhost, malformed URLs and paths
 - [x] Unit tests for development defaults and production rejection/acceptance cases
 - [x] CI security configuration test step
-- [ ] Replace shared bearer token with authenticated user/session identity and RBAC
+- [x] Replace shared bearer token with authenticated user/session identity and RBAC (Phase 21 implementation)
 - [ ] Project/resource ownership enforcement across every route
-- [ ] Reviewer identity derived from authenticated identity, not request payload
+- [x] Reviewer identity derived from authenticated identity, not request payload (review routes)
 - [ ] Secrets rotation and revocation strategy
 
 ## Phase 21 — Authentication & Project RBAC (implementation in progress)
