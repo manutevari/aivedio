@@ -84,7 +84,7 @@ def fail(j,e):
  with db() as c:
   with c.cursor() as cur:
    status="queued" if j["attempt"]<j["max_attempts"] else "failed"
-   cur.execute("UPDATE audio_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '20 seconds',updated_at=now() WHERE id=%s",(status,str(e)[:1000],j["id"]))
+   cur.execute("UPDATE audio_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '20 seconds',updated_at=now() WHERE id=%s AND lease_owner=%s",(status,str(e)[:1000],j["id"],WORKER_ID))
 def main():
  print("AIVEDIO Audio QA worker",WORKER_ID)
  while True:
