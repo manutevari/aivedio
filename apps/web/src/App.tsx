@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 
-const API=(import.meta as any).env?.VITE_AIVEDIO_API_URL??"http://localhost:3000";
+const configuredApi=(import.meta as any).env?.VITE_AIVEDIO_API_URL?.trim();
+const API=configuredApi||((import.meta as any).env?.DEV?"http://localhost:3000":"");
 type Row=Record<string,any>;
 type Project={id:string;title:string;mode?:string;creative_brief?:string};
 type Scene={id:string;title:string;prompt?:string;duration_seconds?:number;scene_order?:number;status?:string};
@@ -10,6 +11,7 @@ const tabs=["Overview","Team","Plan","Script","Storyboard","Assets","Flow Librar
 const modes=["Simple Mode","Flow Mode","Pro Mode","Studio Mode"];
 const req=(method:string,body?:unknown):RequestInit=>({method,...(body===undefined?{}:{body:JSON.stringify(body)})});
 async function api<T=any>(url:string,init?:RequestInit):Promise<T>{
+ if(!API)throw new Error("AIVEDIO API is not configured. Set VITE_AIVEDIO_API_URL in Vercel project Environment Variables. The Streamlit app uses AIVEDIO_API_URL in its Secrets.");
  const token=sessionStorage.getItem("aivedio-session");const r=await fetch(API+url,{...init,headers:{"content-type":"application/json",...(token?{Authorization:"Bearer "+token}:{}),...(init?.headers??{})}});
  if(!r.ok){let detail="";try{detail=await r.text()}catch{}throw new Error(detail||r.statusText||"API request failed")}
  return r.status===204?null as T:r.json();
