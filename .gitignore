@@ -4,3 +4,5 @@ dist
 .env.local
 coverage
 .DS_Store
+
+qa-worker.env
