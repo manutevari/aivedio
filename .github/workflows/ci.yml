@@ -49,6 +49,8 @@ jobs:
         run: pnpm build
       - name: Apply migrations to disposable CI database
         run: pnpm --filter @aivedio/api test:migrate
+      - name: Agent output validation tests
+        run: pnpm --filter @aivedio/api test:agents
       - name: Authentication security tests
         run: pnpm --filter @aivedio/api test:security
       - name: API production workflow E2E smoke
