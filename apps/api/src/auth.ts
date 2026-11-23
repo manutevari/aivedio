@@ -1,7 +1,5 @@
 import {createHmac,randomBytes,timingSafeEqual,scrypt as scryptCallback} from "node:crypto";
-import {promisify} from "node:util";
 import {requireDb} from "./db.js";
-const scrypt=promisify(scryptCallback);
 function derive(password:string,salt:string|Buffer,keylen:number,options:{N:number;r:number;p:number;maxmem:number}){return new Promise<Buffer>((resolve,reject)=>scryptCallback(password,salt,keylen,options,(error,key)=>error?reject(error):resolve(key as Buffer)))}
 const TTL_DAYS=14, N=32768,R=8,P=1;
 export interface AuthUser{id:string;email:string;display_name:string;global_role:"admin"|"member";}
