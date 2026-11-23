@@ -52,16 +52,15 @@ export async function transferProjectOwnership(projectId:string,newOwnerId:strin
 export async function requestPasswordReset(emailInput:string){
  const email=emailNorm(String(emailInput??""));if(!email||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return;
  const user=(await requireDb().query("SELECT id,email FROM users WHERE lower(email)=$1 AND disabled_at IS NULL",[email])).rows[0];if(!user)return;
+ const emailApi=process.env.RESEND_API_KEY,from=process.env.AIVEDIO_EMAIL_FROM;if(!emailApi||!from)return;
  const token=randomBytes(32).toString("base64url"),digest=createHmac("sha256",process.env.AIVEDIO_SESSION_SECRET!).update("password-reset:"+token).digest("hex");
  const expires=new Date(Date.now()+30*60*1000);
- await requireDb().query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[user.id]);
- await requireDb().query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,$3)",[user.id,digest,expires]);
  const base=(process.env.AIVEDIO_WEB_URL||process.env.AIVEDIO_SITE_URL||"http://localhost:5173").replace(/\/$/,"");
  const link=base+"/?resetToken="+encodeURIComponent(token);
- const emailApi=process.env.RESEND_API_KEY,from=process.env.AIVEDIO_EMAIL_FROM;
- if(!emailApi||!from)throw new Error("Password reset email delivery is not configured");
  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+emailApi,"Content-Type":"application/json"},body:JSON.stringify({from,to:[user.email],subject:"Reset your AIVEDIO password",text:"Use this link within 30 minutes to reset your password: "+link+"\nIf you did not request this, ignore this email."}),signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw new Error("Password reset email delivery failed");
+ await requireDb().query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[user.id]);
+ await requireDb().query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,$3)",[user.id,digest,expires]);
 }
 export async function resetPassword(tokenInput:string,passwordInput:string){
  const token=String(tokenInput??"").trim();if(token.length<20||token.length>200)throw new Error("Invalid or expired reset token");
