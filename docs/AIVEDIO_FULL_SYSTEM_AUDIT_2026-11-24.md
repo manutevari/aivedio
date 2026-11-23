@@ -44,3 +44,39 @@ Read-only source review of current `main` (commit `8a1c777d5be89e50b40affa9c98ac
 
 ## Audit limitation
 This is a source/configuration audit with evidence from the current branch and CI/deployment metadata. It is not a penetration test, does not prove the live service is secure, and does not replace runtime verification.
+
+## Authorization matrix (source audit)
+
+| Route/resource family | Scope mechanism | Role gate | Adversarial test |
+|---|---|---|---|
+| Project CRUD/scenes/flow | Project path membership; direct scene IDs resolved to owning project | Viewer GET; editor/owner mutations; reviewer restricted review actions | Cross-project project read + direct scene mutation; flow reorder foreign scene ID |
+| Members/ownership | Project path | Owner/admin; ownership transfer admin-only | Owner/member matrix still needs exhaustive add/remove/transfer tests |
+| Assets | Project path or direct asset ID resolved to project | Project role; reviewer actions | Foreign asset review |
+| Generation jobs | Project path or direct job ID resolved to project | Project role; transition admin/worker restricted | Foreign review and transition |
+| Render jobs | Project path or direct render ID resolved to project | Project role; review actions reviewer+ | Foreign read/review |
+| Timeline tracks/clips | Track/clip IDs resolved through owning project | Project role | Foreign track patch, clip patch/split/delete |
+| Subtitles | Direct subtitle ID resolved to project | Project role | Foreign subtitle delete |
+| Workflow runs/events/checkpoints | Run ID resolves to project; unscoped runs fail closed for non-admin | Project role; transition/checkpoint admin restricted | Foreign events/checkpoints; worker mutation |
+| Plans/script packages/production cuts/audio plans | Project path; service queries use project_id + nested ID | Project role; review/approve actions reviewer+ | Nested-ID mismatches require expanded fixtures |
+| Memory/query/cache | Project scope inferred from query/body; global search restricted; cache admin-only | Project role or admin | Verify global memory visibility and write scoping |
+| Providers | Global configuration | Admin-only | Non-admin read/write/route/discovery checks |
+| Auth | Public auth routes with rate limit; session for remaining API | Account/session rules | bootstrap one-time, registration policy, reset token, revoked session, limiter |
+
+## New adversarial finding and corrective action
+
+**Finding AVD-AUTH-001 (P1): flow scene reorder accepted caller-provided scene IDs without proving those IDs belonged to the route project.** The SQL `ON CONFLICT(id) DO UPDATE` could overwrite a scene in another project by submitting its ID while authorized for a different project. This was confirmed by source inspection; a regression test is added to the API E2E suite.
+
+**Fix on audit branch:** `replaceFlowScenes` now locks and prevalidates existing scene IDs against the requested project, and the conflict update includes `WHERE scenes.project_id=excluded.project_id`; zero-row conflicts fail closed. The route returns 404 for a foreign scene ID. The test verifies the foreign scene's title/prompt/duration remain unchanged.
+
+Additional adversarial tests now exercise foreign project reads, scene mutation, flow reorder, subtitle delete, asset review, generation-job review, render-job read/review, workflow events/checkpoints, timeline track mutation, clip mutation/split/delete. Tests are pending CI execution; their existence is not a passing result.
+
+## Remaining authorization work
+
+- Run the E2E matrix in disposable Postgres and fix all failures.
+- Test all roles (owner/editor/reviewer/viewer/admin) on every mutation and review endpoint, including review-role restrictions.
+- Exercise every nested ID parameter (planId, packageId, cutId, audio planId/cueId, reportId, runId) with foreign IDs and parent-project mismatch.
+- Test body/query project ID spoofing against global endpoints and verify no route ignores the scope it authorizes.
+- Test bulk arrays (flow scenes, asset assignments, references) for mixed-project IDs and transactional rollback.
+- Test cross-project asset/scene attachment to timeline clips and audio plans/cuts.
+- Test project member removal, owner transfer, admin/member boundaries and disabled-account sessions.
+- Verify global admin operations have least-privilege policy and audited actor identity.
