@@ -55,8 +55,9 @@ export async function requestPasswordReset(emailInput:string){
  const user=(await requireDb().query("SELECT id,email FROM users WHERE lower(email)=$1 AND disabled_at IS NULL",[email])).rows[0];
  const token=randomBytes(32).toString("base64url"),digest=createHmac("sha256",secret).update("password-reset:"+token).digest("hex");
  const expires=new Date(Date.now()+30*60*1000);
- const base=(process.env.AIVEDIO_WEB_URL||process.env.AIVEDIO_SITE_URL||"http://localhost:5173").replace(/\/$/,"");
- const link=base+"/?resetToken="+encodeURIComponent(token);
+ const rawBase=(process.env.AIVEDIO_WEB_URL||process.env.AIVEDIO_SITE_URL||"http://localhost:5173").trim();let baseUrl:URL;try{baseUrl=new URL(rawBase)}catch{return}
+ if(!["https:","http:"].includes(baseUrl.protocol)||baseUrl.username||baseUrl.password||baseUrl.pathname!="/"||baseUrl.search||baseUrl.hash||baseUrl.protocol==="http:"&&!/^localhost$|^127\.0\.0\.1$|^\[::1\]$/.test(baseUrl.hostname))return;
+ const link=baseUrl.origin+"/?resetToken="+encodeURIComponent(token);
  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+emailApi,"Content-Type":"application/json"},body:JSON.stringify({from,to:[user.email],subject:"Reset your AIVEDIO password",text:"Use this link within 30 minutes to reset your password: "+link+"\nIf you did not request this, ignore this email."}),signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw new Error("Password reset email delivery failed");
  const client=await requireDb().connect();try{await client.query("BEGIN");await client.query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[user.id]);await client.query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,$3)",[user.id,digest,expires]);await client.query("COMMIT")}catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}
