@@ -110,11 +110,15 @@ def process(job):
  status="completed" if not warnings else "partial" if chunks or frames else "unavailable"
  with db() as conn:
   with conn.cursor() as cur:
+   cur.execute("SELECT status,lease_owner FROM asset_analysis_jobs WHERE id=%s FOR UPDATE",(job["id"],))
+   lease=cur.fetchone()
+   if not lease or lease["status"]!="processing" or lease["lease_owner"]!=WORKER_ID:raise RuntimeError("Asset-analysis worker lease lost")
    for x in extracts:cur.execute("INSERT INTO asset_extractions(asset_id,job_id,kind,status,content,structured,tool_name,confidence) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",(asset["id"],job["id"],x[0],x[1],x[2],json.dumps(x[3]),x[4],x[5]))
    for i,c in enumerate(chunks):cur.execute("INSERT INTO media_chunks(asset_id,project_id,kind,content,ordinal,page,start_seconds,end_seconds,metadata) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)",(asset["id"],asset["project_id"],c["kind"],c["content"],i,c.get("page"),c.get("start_seconds"),c.get("end_seconds"),json.dumps(c.get("metadata",{}))))
    for f in frames:cur.execute("INSERT INTO media_keyframes(asset_id,project_id,timestamp_seconds,storage_key,metadata) VALUES(%s,%s,%s,%s,%s) ON CONFLICT(asset_id,timestamp_seconds) DO UPDATE SET storage_key=excluded.storage_key,metadata=excluded.metadata",(asset["id"],asset["project_id"],f["timestamp_seconds"],f["storage_key"],json.dumps(f["metadata"])))
    cur.execute("UPDATE media_assets SET analysis_status=%s,analysis_metadata=%s WHERE id=%s",(status,json.dumps({"warnings":warnings,"metadata":metadata,"chunkCount":len(chunks),"keyframeCount":len(frames)}),asset["id"]))
-   cur.execute("UPDATE asset_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s",(status,"; ".join(warnings) if warnings else None,job["id"]))
+   cur.execute("UPDATE asset_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s AND lease_owner=%s",(status,"; ".join(warnings) if warnings else None,job["id"],WORKER_ID))
+   if cur.rowcount!=1:raise RuntimeError("Asset-analysis lease lost during persistence")
 def fail(job,error):
  with db() as conn:
   with conn.cursor() as cur:
