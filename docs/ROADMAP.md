@@ -217,10 +217,10 @@
 
 ## Phase 22 — Security Audit & Studio Membership UX
 - [ ] Complete route-by-route authorization matrix and tests for every resource endpoint
-- [ ] Login rate limiting and abuse protection
+- [x] In-process rate limits for login/register/bootstrap and API security headers (CI pending latest commit)
 - [ ] Session management/revocation UI and account recovery
 - [ ] Admin user management and invitation flow
-- [ ] Studio project members panel (invite/remove/change roles)
+- [x] Studio project members panel (invite existing account/remove member) in React and Streamlit (CI pending latest commit)
 - [ ] Derive all audit actors from session identity and remove caller-supplied actor fields
 - [ ] Security headers/CSP and production secrets/rotation documentation
 - [ ] Migration rehearsal, release checklist and rollback plan
