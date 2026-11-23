@@ -1,7 +1,5 @@
 {
-  "buildCommand": "pnpm install --no-frozen-lockfile && pnpm --filter @aivedio/api build",
-  "installCommand": "pnpm install --no-frozen-lockfile",
-  "outputDirectory": "dist",
-  "functions": { "index.ts": { "maxDuration": 60 } },
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.ts" }]
+  "installCommand": "corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm --filter @aivedio/api build",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }
