@@ -53,6 +53,7 @@ export async function requestPasswordReset(emailInput:string){
  const email=emailNorm(String(emailInput??""));if(!email||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return;
  const emailApi=process.env.RESEND_API_KEY,from=process.env.AIVEDIO_EMAIL_FROM,secret=process.env.AIVEDIO_SESSION_SECRET;if(!emailApi||!from||!secret||secret.length<32||from.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from))return;
  const user=(await requireDb().query("SELECT id,email FROM users WHERE lower(email)=$1 AND disabled_at IS NULL",[email])).rows[0];
+ if(!user){await derive("dummy-reset-password","aivedio-reset-dummy-salt",64,{N,r:R,p:P,maxmem:128*1024*1024});return}
  const token=randomBytes(32).toString("base64url"),digest=createHmac("sha256",secret).update("password-reset:"+token).digest("hex");
  const expires=new Date(Date.now()+30*60*1000);
  const rawBase=(process.env.AIVEDIO_WEB_URL||process.env.AIVEDIO_SITE_URL||"http://localhost:5173").trim();let baseUrl:URL;try{baseUrl=new URL(rawBase)}catch{return}
