@@ -2,11 +2,12 @@ import {ChatOpenAI} from "@langchain/openai";
 import {HumanMessage,SystemMessage} from "@langchain/core/messages";
 import {traceable} from "langsmith/traceable";
 import {requireDb} from "./db.js";
+import {parseAgentJson,type JsonObject,type AgentRole} from "./agent-validation.js";
 
-type Json=Record<string,unknown>;
+type Json=JsonObject;
 const apiKey=()=>process.env.OPENROUTER_API_KEY?.trim();
 const model=()=>process.env.OPENROUTER_AGENT_MODEL?.trim()||"openrouter/auto";
-const prompts:Record<string,string>={
+const prompts:Record<AgentRole,string>={
  "Improvisor":"You are AIVEDIO Improvisor: generate useful, grounded creative and production improvements. Return JSON {ideas:[{title,description,impact,risks}],recommendedDirection,assumptions}. Never claim facts unsupported by input.",
  "Implementation Agent":"You are AIVEDIO Implementation Agent. Convert the approved direction into a practical staged plan. Return JSON {steps:[{id,title,description,ownerRole,dependencies,acceptanceCriteria}],requirements,risks,rollback}. Avoid actions requiring external credentials or irreversible operations.",
  "Patcher":"You are AIVEDIO Patcher. Produce a minimal revised creative brief, not code or executable instructions. Preserve user intent and explicit constraints. Return JSON {target:'projects.creative_brief',before,after,summary,changeSet:[{type:'replace',description}],reversible:true}. 'after' must be a string and must never exceed 20000 characters. Preserve all required safety, legal and privacy constraints; never remove them.",
@@ -16,12 +17,12 @@ function agentClient(role:string){
  const key=apiKey();if(!key)throw new Error("OPENROUTER_API_KEY is not configured on the AIVEDIO API server");
  return new ChatOpenAI({apiKey:key,model:model(),temperature:0.2,timeout:60000,maxRetries:2,configuration:{baseURL:"https://openrouter.ai/api/v1",defaultHeaders:{"HTTP-Referer":process.env.AIVEDIO_SITE_URL||"https://aivedio.local","X-Title":"AIVEDIO "+role}}});
 }
-function agentTrace(role:string,projectId:string){
+function agentTrace(role:AgentRole,projectId:string){
  return traceable(async(input:unknown)=>{
   const response=await agentClient(role).invoke([new SystemMessage(prompts[role]),new HumanMessage(JSON.stringify(input))]);
   const content=typeof response.content==="string"?response.content:Array.isArray(response.content)?response.content.map(x=>typeof x==="string"?x:(x as any).text??"").join(""):"";
   if(!content.trim())throw new Error(role+" returned an empty response");
-  try{return JSON.parse(content)}catch{throw new Error(role+" returned invalid JSON")}
+  return parseAgentJson(role,content)
  },{name:"AIVEDIO "+role,run_type:"llm",tracingEnabled:process.env.LANGSMITH_TRACING?.toLowerCase()==="true",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:"openrouter",model:model()},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\s+/g,"-")]});
 }
 function normalizeBrief(value:unknown){return typeof value==="string"?value.slice(0,20000):""}
