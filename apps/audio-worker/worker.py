@@ -74,8 +74,12 @@ def process(job):
  status="fail" if any(f["severity"]=="error" for f in fs) else "warning" if fs else "pass"
  with db() as c:
   with c.cursor() as cur:
+   cur.execute("SELECT status,lease_owner FROM audio_analysis_jobs WHERE id=%s FOR UPDATE",(job["id"],))
+   lease=cur.fetchone()
+   if not lease or lease["status"]!="processing" or lease["lease_owner"]!=WORKER_ID:raise RuntimeError("Audio-analysis worker lease lost")
    cur.execute("INSERT INTO audio_analysis_reports(project_id,asset_id,job_id,status,score,metrics,findings,thresholds) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",(job["project_id"],asset["id"],job["id"],status,score,json.dumps(metrics),json.dumps(fs),json.dumps(job["thresholds"] or {})))
-   cur.execute("UPDATE audio_analysis_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s",(job["id"],))
+   cur.execute("UPDATE audio_analysis_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s AND lease_owner=%s",(job["id"],WORKER_ID))
+   if cur.rowcount!=1:raise RuntimeError("Audio-analysis lease lost during persistence")
 def fail(j,e):
  with db() as c:
   with c.cursor() as cur:
