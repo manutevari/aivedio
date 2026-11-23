@@ -329,6 +329,41 @@ else:
                     if c2.button("Reject render",key="reject-render-"+render["id"]):
                         action(lambda:api(f"/v1/render-jobs/{render['id']}/review","POST",{"decision":"reject","reviewer":reviewer,"notes":"Reviewed in Streamlit"}),"Render rejected")
 
+    elif page=="Agent Pipeline":
+        st.subheader("Improvisor · Implementation · Auditor · Patcher")
+        st.info("Human-in-the-loop: proposals are not applied unless you approve the run and then explicitly apply the patch.")
+        with st.form("agent_pipeline"):
+            agent_brief=st.text_area("Brief override (optional)",value=st.session_state.project.get("creative_brief") or "")
+            agent_outcome=st.text_area("Desired outcome",value="Improve creative direction, continuity, production readiness and quality.")
+            start_agent=st.form_submit_button("Run agents")
+        if start_agent:
+            action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs","POST",{"brief":agent_brief,"requestedOutcome":agent_outcome}),"Agent proposal created")
+            st.rerun()
+        agent_runs=safe(f"/v1/projects/{project_id}/agent-pipeline/runs",[])
+        for run in agent_runs:
+            with st.expander(f"{run.get('status')} · {run.get('created_at')}"):
+                detail=safe(f"/v1/projects/{project_id}/agent-pipeline/runs/{run['id']}",run)
+                st.metric("Audit score",detail.get("audit",{}).get("score","—"))
+                st.write("Verdict",detail.get("audit",{}).get("verdict"))
+                st.json(detail.get("improvisor",{}))
+                st.subheader("Implementation plan")
+                st.json(detail.get("implementation_plan",{}))
+                st.subheader("Auditor findings")
+                st.json(detail.get("audit",{}))
+                st.subheader("Patch proposal")
+                st.json(detail.get("patch",{}))
+                if detail.get("status")=="awaiting_approval":
+                    c1,c2=st.columns(2)
+                    if c1.button("Reject proposal",key="agent-reject-"+detail["id"]):
+                        action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs/{detail['id']}/decision","POST",{"decision":"reject","notes":"Rejected in Streamlit HITL"}),"Run rejected")
+                        st.rerun()
+                    if c2.button("Approve proposal",key="agent-approve-"+detail["id"]):
+                        action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs/{detail['id']}/decision","POST",{"decision":"approve","notes":"Approved in Streamlit HITL"}),"Run approved")
+                        st.rerun()
+                if detail.get("status")=="approved" and st.button("Apply approved patch",key="agent-apply-"+detail["id"]):
+                    action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs/{detail['id']}/apply","POST",{}),"Patch applied")
+                    st.rerun()
+
     elif page=="Generation Jobs":
         st.subheader("Generation queue")
         for job in jobs:
