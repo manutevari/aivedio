@@ -62,7 +62,7 @@ try{
  assert.equal(logout.status,204);
  const revoked=await fetch(baseUrl+"/v1/auth/me",{headers:{Authorization:"Bearer "+loginSession.token}});
  assert.equal(revoked.status,401,"Revoked sessions must stop authenticating");
- for(let attempt=0;attempt<6;attempt++){
+ for(let attempt=0;attempt<7;attempt++){
   const response=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
   assert.equal(response.status,401,"Invalid login attempt must be rejected");
  }
