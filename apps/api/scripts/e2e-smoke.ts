@@ -104,14 +104,14 @@ try{
  const shots=plan.scenes.flatMap((scene:any)=>scene.shots.map((shot:any)=>({scene,shot})));
  for(const {scene,shot} of shots){
   const job=await db.query(
-   `INSERT INTO generation_jobs(project_id,scene_id,task,provider_id,prompt,status,safety_status,quality_status,completed_at)
-    VALUES($1,$2,'video','aivedio-ci-fixture',$3,'completed','approved','pass',now()) RETURNING id`,
-   [project.id,scene.id,shot.generationPrompt]
+   `INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status,completed_at)
+    VALUES($1,'video','aivedio-ci-fixture',$2,'completed','approved','pass',now()) RETURNING id`,
+   [project.id,shot.generationPrompt]
   );
   const asset=await db.query(
-   `INSERT INTO media_assets(project_id,scene_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata)
-    VALUES($1,$2,$3,'video','ready','ci-fixture',$4,'video/mp4',1,$5::jsonb) RETURNING id`,
-   [project.id,scene.id,job.rows[0].id,`ci-fixture/${shot.id}.mp4`,JSON.stringify({shotId:shot.id,durationSeconds:120,fixture:true})]
+   `INSERT INTO media_assets(project_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata)
+    VALUES($1,$2,'video','ready','ci-fixture',$3,'video/mp4',1,$4::jsonb) RETURNING id`,
+   [project.id,job.rows[0].id,`ci-fixture/${shot.id}.mp4`,JSON.stringify({shotId:shot.id,planSceneId:scene.id,durationSeconds:120,fixture:true})]
   );
   assetAssignments[shot.id]=asset.rows[0].id;
   await db.query(
