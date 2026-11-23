@@ -66,7 +66,8 @@ def rate(v):
 def claim():
  with db() as c:
   with c.cursor() as cur:
-   cur.execute("WITH q AS(SELECT id FROM quality_jobs WHERE status='queued' AND available_at<=now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE quality_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
+   cur.execute("UPDATE quality_jobs SET status='failed',error=COALESCE(error,'Worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE status='processing' AND lease_expires_at<now() AND attempt>=max_attempts")
+   cur.execute("WITH q AS(SELECT id FROM quality_jobs WHERE ((status='queued' AND available_at<=now()) OR (status='processing' AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE quality_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
 def score(fs):return max(0,100-sum({"info":0,"warning":5,"error":18,"critical":40}.get(x["severity"],0) for x in fs))
 def status(fs):return "fail" if any(x["severity"] in ("error","critical") for x in fs) else "warning" if any(x["severity"]=="warning" for x in fs) else "pass"
 def process(j):
