@@ -9,6 +9,24 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aivedio
+          POSTGRES_PASSWORD: aivedio_ci
+          POSTGRES_DB: aivedio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aivedio -d aivedio_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://aivedio:aivedio_ci@localhost:5432/aivedio_test
+      AIVEDIO_API_TOKEN: ci-test-token-not-for-production
+      AIVEDIO_E2E_PORT: 3419
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,6 +43,10 @@ jobs:
         run: pnpm typecheck
       - name: Build
         run: pnpm build
+      - name: Apply migrations to disposable CI database
+        run: pnpm --filter @aivedio/api test:migrate
+      - name: API production workflow E2E smoke
+        run: pnpm --filter @aivedio/api test:e2e
       - name: Python syntax check
         run: |
           python -m compileall -q apps/streamlit apps/audio-worker apps/qa-worker
