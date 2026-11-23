@@ -28,3 +28,6 @@ GitHub Actions provisions a PostgreSQL 16 service, applies migrations to the dis
 - The render review lifecycle is tested with fixture worker-result fields, not a real worker.
 - This does not validate browser UI, Streamlit UI, real storage, authentication roles, ownership authorization, or production deployment.
 - No production database was touched and no deployment was made.
+
+## CI verification
+The corrected smoke test passed on commit `3602cf5c04df6113716b5859314f97fec70320bb`. The GitHub Actions job completed all steps: typecheck, build, migrations, API E2E smoke, Python syntax and Streamlit dependency checks.
