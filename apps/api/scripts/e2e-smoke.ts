@@ -116,6 +116,7 @@ try{
  assert.equal(forbiddenTransition.status,403,"Workflow state transitions are restricted to admins/trusted workers");
  const forbiddenCheckpoint=await fetch(baseUrl+"/v1/workflows/"+workerRun.id+"/checkpoints",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({nodeId:"test",payload:{}})});
  assert.equal(forbiddenCheckpoint.status,403,"Workflow checkpoints are restricted to admins/trusted workers");
+ await db.query("INSERT INTO media_providers(provider_id,name,source,descriptor) VALUES('aivedio-ci-fixture','AIVEDIO CI Fixture','test',$1::jsonb) ON CONFLICT(provider_id) DO NOTHING",[JSON.stringify({fixture:true,description:"CI-only fixture provider"})]);
  const reviewerJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status) VALUES($1,'video','ci-fixture','review actor binding','awaiting_approval','pending') RETURNING id",[project.id]);
  const forbiddenJobTransition=await fetch(baseUrl+"/v1/generation-jobs/"+reviewerJob.rows[0].id+"/transition",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({status:"completed",result:{spoofed:true}})});
  assert.equal(forbiddenJobTransition.status,403,"Project reviewer cannot impersonate generation worker");
