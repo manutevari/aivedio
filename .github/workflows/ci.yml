@@ -55,7 +55,7 @@ jobs:
         run: pnpm --filter @aivedio/api test:e2e
       - name: Python syntax check
         run: |
-          python -m compileall -q apps/streamlit apps/audio-worker apps/qa-worker
+          python -m compileall -q apps/streamlit apps/asset-worker apps/audio-worker apps/qa-worker
       - name: Check Streamlit requirements
         run: |
-          python -m pip install --dry-run -r apps/streamlit/requirements.txt
+          python -m pip install --dry-run -r apps/streamlit/requirements.txt\n          python -m pip install --dry-run -r apps/asset-worker/requirements.txt\n          python -m pip install --dry-run -r apps/audio-worker/requirements.txt\n          python -m pip install --dry-run -r apps/qa-worker/requirements.txt
