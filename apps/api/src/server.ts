@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import {loadApiSecurityConfig} from "./security-config.js";
+import {AuthRateLimiter} from "./auth-rate-limit.js";
 import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember,transferProjectOwnership} from "./auth.js";
 import type {AuthUser} from "./auth.js";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
@@ -29,8 +30,7 @@ import {reviewRenderJob} from "./timeline.js";
 const app=Fastify({logger:true});
 const securityConfig=loadApiSecurityConfig(process.env);
 const allowedOrigins=securityConfig.allowedOrigins;
-const authAttemptBuckets=new Map<string,{count:number;resetAt:number}>();
-function allowAuthAttempt(key:string,limit:number,windowMs:number){const now=Date.now();for(const [k,v] of authAttemptBuckets)if(v.resetAt<=now)authAttemptBuckets.delete(k);const current=authAttemptBuckets.get(key);if(!current||current.resetAt<=now){authAttemptBuckets.set(key,{count:1,resetAt:now+windowMs});return true}if(current.count>=limit)return false;current.count++;return true}
+const authLimiter=new AuthRateLimiter(10000);
 app.addHook("onRequest",async(request,reply)=>{
  reply.header("X-Content-Type-Options","nosniff");
  reply.header("X-Frame-Options","DENY");
@@ -43,7 +43,7 @@ app.addHook("preHandler",async(request,reply)=>{
  if(request.method==="OPTIONS")return reply.code(204).send();
  if(request.url==="/health"||request.url==="/ready")return;
  const pathname=request.url.split("?")[0]??"/";
- if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap"].includes(pathname)){const key=pathname+":"+request.ip;if(!allowAuthAttempt(key,pathname.endsWith("login")?8:4,15*60*1000))return reply.code(429).send({error:"Too many authentication attempts. Try again later."});return;}
+ if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap"].includes(pathname)){const key=pathname+":"+request.ip;const decision=authLimiter.allow(key,pathname.endsWith("login")?8:4,15*60*1000);if(!decision.allowed){reply.header("Retry-After",String(Math.ceil(decision.retryAfterMs/1000)));return reply.code(429).send({error:"Too many authentication attempts. Try again later."});}return;}
  const bearer=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
  let user:AuthUser|null=null;
  try{user=await authenticateSession(bearer)}catch(error){request.log.error(error);return reply.code(500).send({error:"Authentication service unavailable"})}
