@@ -70,6 +70,7 @@ export async function resetPassword(tokenInput:string,passwordInput:string){
  try{await client.query("BEGIN");const row=(await client.query("SELECT user_id FROM password_reset_tokens WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() FOR UPDATE",[digest])).rows[0];if(!row)throw new Error("Invalid or expired reset token");
  await client.query("UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1",[row.user_id]);
  await client.query("UPDATE user_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",[row.user_id]);
+ await client.query("INSERT INTO query_history(project_id,query,intent,response_summary) VALUES(NULL,$1,'password_reset',$2)",["Password reset completed for user "+row.user_id,"All active sessions revoked"]);
  await client.query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[row.user_id]);
  await client.query("UPDATE password_reset_tokens SET used_at=now() WHERE token_hash=$1",[digest]);
  await client.query("COMMIT");return true;
