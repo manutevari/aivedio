@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import {loadApiSecurityConfig} from "./security-config.js";
-import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember} from "./auth.js";
+import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember,transferProjectOwnership} from "./auth.js";
 import type {AuthUser} from "./auth.js";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
 import {createAssetQualityJob,listQualityJobs,listQualityReports,getQualityReport,runContinuityReview,applySafetyReview,listSafetyReviews} from './quality.js';
