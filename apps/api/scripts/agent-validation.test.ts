@@ -1,0 +1,10 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {parseAgentJson} from "../src/agent-validation.js";
+test("parses fenced JSON from agent response",()=>{const result=parseAgentJson("Improvisor",```json
+{"ideas":[{"title":"Improve","description":"desc","impact":"high","risks":[]}],"recommendedDirection":"go","assumptions":[]}
+```);assert.equal(result.recommendedDirection,"go")});
+test("validates implementation agent steps",()=>{const result=parseAgentJson("Implementation Agent",JSON.stringify({steps:[{id:"1",title:"Step",description:"Do",ownerRole:"agent",dependencies:[],acceptanceCriteria:["ok"]}],requirements:[],risks:[],rollback:"undo"}));assert.equal(result.steps.length,1)});
+test("rejects patch outside creative brief target or oversized content",()=>{assert.throws(()=>parseAgentJson("Patcher",JSON.stringify({target:"source_code",before:"x",after:"y",summary:"s",changeSet:[],reversible:true})),/schema validation/);assert.throws(()=>parseAgentJson("Patcher",JSON.stringify({target:"projects.creative_brief",before:"x",after:"x".repeat(20001),summary:"s",changeSet:[],reversible:true})),/schema validation/)});
+test("auditor score and finding severity are strictly validated",()=>{const valid={verdict:"pass",score:80,findings:[],requiredHumanChecks:[],summary:"ok"};assert.equal(parseAgentJson("Auditor",JSON.stringify(valid)).score,80);assert.throws(()=>parseAgentJson("Auditor",JSON.stringify({...valid,score:80.5})),/schema validation/);assert.throws(()=>parseAgentJson("Auditor",JSON.stringify({...valid,findings:[{severity:"blocker",finding:"x",evidence:"y",recommendation:"z"}]})),/schema validation/)});
+test("rejects malformed or non-object JSON",()=>{assert.throws(()=>parseAgentJson("Auditor","not JSON"),/invalid JSON/);assert.throws(()=>parseAgentJson("Auditor","[]"),/expected an object/)});
