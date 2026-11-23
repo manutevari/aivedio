@@ -95,7 +95,7 @@ with st.sidebar:
         st.success(api("/health").get("status","connected"))
     except Exception:
         st.error("API offline · persistence disabled")
-    page=st.radio("Workspace",["Overview","Team","Creative Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs"])
+    page=st.radio("Workspace",["Overview","Team","Creative Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs","Agent Pipeline"])
     st.divider()
     new_title=st.text_input("New production title")
     new_brief=st.text_area("Creative brief",height=100)
