@@ -7,9 +7,10 @@ const {Pool}=pg;
 const apiRoot=fileURLToPath(new URL("../",import.meta.url));
 const port=Number(process.env.AIVEDIO_E2E_PORT??3419);
 const baseUrl=`http://127.0.0.1:${port}`;
-const token=process.env.AIVEDIO_API_TOKEN;
+let token="";
+const bootstrapKey=process.env.AIVEDIO_BOOTSTRAP_ADMIN_KEY;
 const databaseUrl=process.env.DATABASE_URL;
-if(!token)throw new Error("AIVEDIO_API_TOKEN is required for the API smoke test");
+if(!bootstrapKey)throw new Error("AIVEDIO_BOOTSTRAP_ADMIN_KEY is required for the API smoke test");
 if(!databaseUrl)throw new Error("DATABASE_URL is required for the API smoke test");
 
 const db=new Pool({connectionString:databaseUrl,max:4});
@@ -25,7 +26,7 @@ api.stderr.on("data",chunk=>{serverOutput=(serverOutput+chunk.toString()).slice(
 async function request(method:string,path:string,body?:unknown,expectedStatus=200){
  const response=await fetch(baseUrl+path,{
   method,
-  headers:{"Authorization":"Bearer "+token,...(body===undefined?{}:{"Content-Type":"application/json"})},
+  headers:{...(token?{"Authorization":"Bearer "+token}:{}),...(body===undefined?{}:{"Content-Type":"application/json"})},
   ...(body===undefined?{}:{body:JSON.stringify(body)})
  });
  const raw=await response.text();
@@ -38,7 +39,7 @@ async function waitForApi(){
  for(let attempt=0;attempt<50;attempt++){
   if(api.exitCode!==null)throw new Error("API process exited before becoming ready.\n"+serverOutput);
   try{
-   const response=await fetch(baseUrl+"/ready",{headers:{Authorization:"Bearer "+token}});
+   const response=await fetch(baseUrl+"/ready");
    if(response.status===200)return;
   }catch{}
   await new Promise(resolve=>setTimeout(resolve,300));
@@ -48,10 +49,17 @@ async function waitForApi(){
 
 try{
  await waitForApi();
+ const adminPassword="CI-"+"Admin-"+"Password-123!";
+ const bootstrap=await request("POST","/v1/auth/bootstrap",{bootstrapKey,email:"admin@ci.aivedio.test",password:adminPassword,displayName:"CI Admin"},201);
+ token=bootstrap.token;
+ assert.ok(token,"Bootstrap must return a session token");
+ await request("GET","/v1/auth/me",undefined,200);
  await request("GET","/health",undefined,200);
  await request("GET","/ready",undefined,200);
  const unauth=await fetch(baseUrl+"/v1/projects");
- assert.equal(unauth.status,401,"API bearer-token protection must reject unauthenticated requests");
+ assert.equal(unauth.status,401,"API must reject unauthenticated requests");
+ const badLogin=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"wrong-password"})});
+ assert.equal(badLogin.status,401,"Invalid credentials must be rejected");
 
  const project=await request("POST","/v1/projects",{
   title:"AIVEDIO CI workflow fixture",
