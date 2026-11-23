@@ -87,9 +87,16 @@ try{
  assert.equal(outsiderProjects.some((p:any)=>p.id===project.id),false,"Project must not appear in another user's project list");
  const outsiderGet=await fetch(baseUrl+`/v1/projects/${project.id}`,{headers:{Authorization:"Bearer "+second.token}});
  assert.equal(outsiderGet.status,404,"Cross-project access must be concealed");
+ const outsiderAssets=await fetch(baseUrl+"/v1/assets",{headers:{Authorization:"Bearer "+second.token}});
+ assert.equal(outsiderAssets.status,200);
+ assert.equal((await outsiderAssets.json()).length,0,"Global asset listing must not leak other projects");
+ const outsiderJobs=await fetch(baseUrl+"/v1/generation-jobs",{headers:{Authorization:"Bearer "+second.token}});
+ assert.equal(outsiderJobs.status,200);
+ assert.equal((await outsiderJobs.json()).length,0,"Global generation-job listing must not leak other projects");
  await request("POST",`/v1/projects/${project.id}/members`,{email:"reviewer@ci.aivedio.test",role:"reviewer"},201);
  const reviewerGet=await fetch(baseUrl+`/v1/projects/${project.id}`,{headers:{Authorization:"Bearer "+second.token}});
  assert.equal(reviewerGet.status,200,"Project reviewer can read project");
+ const reviewerMembers=await fetch(baseUrl+`/v1/projects/${project.id}/members`,{headers:{Authorization:"Bearer "+second.token}});assert.equal(reviewerMembers.status,403,"Reviewer cannot manage project members");
  const reviewerEdit=await fetch(baseUrl+`/v1/projects/${project.id}`,{method:"PATCH",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Unauthorized change"})});
  assert.equal(reviewerEdit.status,403,"Reviewer cannot edit project");
  const planRow=await request("POST",`/v1/projects/${project.id}/creative-plans`,{
@@ -125,6 +132,8 @@ try{
  await request("POST",`/v1/projects/${project.id}/script-packages/${scriptPackageId}/review`,{
   decision:"approve",reviewer:"AIVEDIO CI reviewer",notes:"Fixture package reviewed for integration testing."
  },200);
+ const reviewedPackage=await db.query("SELECT reviewed_by FROM creative_script_packages WHERE id=$1",[scriptPackageId]);
+ assert.equal(reviewedPackage.rows[0].reviewed_by,"admin@ci.aivedio.test","Review actor must be bound to authenticated identity");
 
  await db.query(
   `INSERT INTO media_providers(provider_id,name,source,descriptor)
