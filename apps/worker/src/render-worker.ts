@@ -5,7 +5,7 @@ import {createReadStream} from "node:fs";
 import crypto from "node:crypto";
 import {resolveMediaPath,compileRender,runFfmpeg,probeOutput} from "./render-plan.js";
 import type {RenderManifest} from "@aivedio/core";
-const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:false}:undefined});
+const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:true}:undefined});
 const workerId=process.env.RENDER_WORKER_ID??"render-"+process.pid;let stopped=false;
 process.on("SIGINT",()=>stopped=true);process.on("SIGTERM",()=>stopped=true);
 const srtTime=(ms:number)=>{const n=Math.max(0,Math.round(ms));const h=Math.floor(n/3600000),m=Math.floor(n%3600000/60000),s=Math.floor(n%60000/1000),x=n%1000;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")},${String(x).padStart(3,"0")}`};
