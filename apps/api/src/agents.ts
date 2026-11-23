@@ -2,7 +2,8 @@ import {ChatOpenAI} from "@langchain/openai";
 import {HumanMessage,SystemMessage} from "@langchain/core/messages";
 import {traceable} from "langsmith/traceable";
 import {requireDb} from "./db.js";
-import {parseAgentJson,type JsonObject,type AgentRole} from "./agent-validation.js";\nimport {resolveAgentProvider,agentProviderStatus} from "./agent-provider-router.js";
+import {parseAgentJson,type JsonObject,type AgentRole} from "./agent-validation.js";
+import {resolveAgentProvider,agentProviderStatus} from "./agent-provider-router.js";
 
 type Json=JsonObject;
 const apiKey=()=>process.env.OPENROUTER_API_KEY?.trim();
