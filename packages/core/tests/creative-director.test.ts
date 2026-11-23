@@ -17,3 +17,11 @@ test("creative plans allocate exact positive scene and shot durations at minimum
   }
  }
 });
+
+test("creative plan creation rejects non-finite numeric input",()=>{
+ assert.throws(()=>createCreativePlan({projectTitle:"Bad duration",brief:"Test",targetDurationSeconds:Number.NaN}),/finite number/);
+ assert.throws(()=>createCreativePlan({projectTitle:"Bad fps",brief:"Test",fps:Number.POSITIVE_INFINITY}),/FPS/);
+ const plan=createCreativePlan({projectTitle:"Validation",brief:"Test"});
+ plan.targetDurationSeconds=Number.NaN;
+ assert.equal(validateCreativePlan(plan).valid,false);
+});
