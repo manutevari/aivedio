@@ -75,7 +75,8 @@ app.addHook("preHandler",async(request,reply)=>{
  if(projectId&&request.body&&typeof request.body==="object"&&(request.method==="POST"||request.method==="PUT"||request.method==="PATCH"))(request.body as any).createdBy=user.email;
  if(request.body&&typeof request.body==="object"&&/(review|approve|safety-review)$/.test(pathname))(request.body as any).reviewer=user.email;
  if(user.global_role!=="admin"){
-  if(pathname==="/v1/providers"||pathname==="/v1/providers/discovered"||pathname.startsWith("/v1/intelligence/cache/"))return reply.code(403).send({error:"Admin role required"});
+  if(pathname.startsWith("/v1/providers")||pathname.startsWith("/v1/intelligence/cache/"))return reply.code(403).send({error:"Admin role required"});
+  if(/\\/v1\\/generation-jobs\\/[^/]+\\/transition$/.test(pathname)||/\\/v1\\/workflows\\/[^/]+\\/(transition|checkpoints)$/.test(pathname))return reply.code(403).send({error:"Admin or trusted worker role required"});
   if(pathname==="/v1/memory/search"&&!projectId)return reply.code(403).send({error:"Project scope required"});
   if(pathname.startsWith("/v1/workflows/")&&!projectId)return reply.code(403).send({error:"Project scope required"});
  }
