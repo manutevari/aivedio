@@ -47,6 +47,8 @@ jobs:
         run: pnpm build
       - name: Apply migrations to disposable CI database
         run: pnpm --filter @aivedio/api test:migrate
+      - name: Authentication security tests
+        run: pnpm --filter @aivedio/api test:security
       - name: API production workflow E2E smoke
         run: pnpm --filter @aivedio/api test:e2e
       - name: Python syntax check
