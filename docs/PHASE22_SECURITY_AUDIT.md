@@ -6,9 +6,10 @@
   - Registration and bootstrap: 4 attempts / 15 minutes.
 - API security headers: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`.
 - Authenticated project role endpoint: `GET /v1/projects/:id/role`.
+- Admin-only atomic project ownership transfer endpoint; supports recovery/assignment for legacy projects without owner memberships.
 - React Studio Team tab: owner can add existing accounts as editor/reviewer/viewer and remove non-owner members.
 - Streamlit Team page: same member invite/remove functionality.
-- E2E test for rate-limit activation.
+- E2E test for rate-limit activation and ownership-transfer authorization.
 - Latest validation is pending in GitHub Actions.
 
 ## Remaining
