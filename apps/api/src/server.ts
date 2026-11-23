@@ -1,7 +1,7 @@
 import Fastify from "fastify";
-import {timingSafeEqual} from "node:crypto";
 import {loadApiSecurityConfig} from "./security-config.js";
-import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember,AuthUser} from "./auth.js";
+import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember} from "./auth.js";
+import type {AuthUser} from "./auth.js";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
 import {createAssetQualityJob,listQualityJobs,listQualityReports,getQualityReport,runContinuityReview,applySafetyReview,listSafetyReviews} from './quality.js';
 import {enrichCreativePlan,listScriptPackages,getScriptPackage,reviewScriptPackage} from './scriptwriting.js';
@@ -141,7 +141,7 @@ app.get("/v1/projects/:id/members",async(request,reply)=>{const id=(request.para
 app.post("/v1/projects/:id/members",async(request,reply)=>{try{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});const b=request.body as any;if(!["editor","reviewer","viewer"].includes(b?.role))return reply.code(400).send({error:"Invalid member role"});return reply.status(201).send(await addProjectMember(id,b.email,b.role,user.id))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.delete("/v1/projects/:id/members/:userId",async(request,reply)=>{const p=request.params as any;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,p.id);if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});if(!await removeProjectMember(p.id,p.userId))return reply.code(404).send({error:"Member not found"});return{removed:true}});
 app.get("/v1/projects",async(request)=>listProjects((request as any).user as AuthUser));
-app.post("/v1/projects",async(request,reply)=>{const body=request.body as {title:string;mode?:string;target?:unknown;creativeBrief?:string};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});const user=(request as any).user as AuthUser;const created=await createProject(body);await requireDb().query("UPDATE projects SET owner_user_id=$2 WHERE id=$1",[created.id,user.id]);await requireDb().query("INSERT INTO project_members(project_id,user_id,role) VALUES($1,$2,$3)",[created.id,user.id,"owner"]);return reply.status(201).send(created);});
+app.post("/v1/projects",async(request,reply)=>{const body=request.body as {title:string;mode?:string;target?:unknown;creativeBrief?:string};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});const user=(request as any).user as AuthUser;const created=await createProject(body,user.id);return reply.status(201).send(created);});
 app.get("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await getProject(id);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
 app.patch("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await updateProject(id,request.body as Record<string,unknown>);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
 app.get("/v1/projects/:id/scenes",async(request)=>listScenes((request.params as {id:string}).id));
