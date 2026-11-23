@@ -175,6 +175,12 @@ try{
  const foreignAssetClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign asset attempt",kind:"video",assetId:isolatedAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
  assert.equal(foreignAssetClip.status,400,"Timeline clip creation must reject assets owned by another project");
  const foreignScene=await db.query("INSERT INTO scenes(project_id,scene_order,title,prompt) VALUES($1,999,'Foreign scene fixture','') RETURNING id",[isolatedProject.id]);
+ const validGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,task:"video",prompt:"CI generation ownership test",freeOnly:false})});
+ assert.equal(validGeneration.status,201,"Valid project generation job should be created with the test provider");
+ const foreignSceneGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,sceneId:foreignScene.rows[0].id,task:"video",prompt:"Foreign scene attempt",freeOnly:false})});
+ assert.equal(foreignSceneGeneration.status,400,"Generation jobs must reject scenes from another project");
+ const foreignAssetGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,inputAssets:[isolatedAsset.rows[0].id],task:"video",prompt:"Foreign asset attempt",freeOnly:false})});
+ assert.equal(foreignAssetGeneration.status,400,"Generation jobs must reject input assets from another project");
  const foreignSceneClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign scene attempt",kind:"video",sceneId:foreignScene.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
  assert.equal(foreignSceneClip.status,400,"Timeline clip creation must reject scenes owned by another project");
  const foreignMix=await fetch(baseUrl+`/v1/projects/${project.id}/audio-mix`,{method:"PUT",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({trackId:foreignTrack.rows[0].id,gainDb:0,muted:false})});
@@ -224,6 +230,7 @@ try{
    ON CONFLICT(provider_id) DO NOTHING`,
   [JSON.stringify({fixture:true,description:"CI-only synthetic media rows; no external provider call."})]
  );
+ await db.query("UPDATE media_providers SET descriptor=$2::jsonb WHERE provider_id=$1",["aivedio-ci-fixture",JSON.stringify({id:"aivedio-ci-fixture",name:"AIVEDIO CI Fixture",source:"manual",capabilities:[{task:"video",inputs:["prompt"],outputs:["video"],maxDurationSeconds:120,aspectRatios:["16:9"],resolutions:["720p","1080p"],supportsReferences:true,supportsAudio:false}],authRequired:false,authConfigured:false,pricing:{free:true,verifiedAt:new Date().toISOString()},trust:{verified:true,score:100,notes:["Synthetic CI-only provider"]},availability:"available"})]);
  const assetAssignments:Record<string,string>={};
  const shots=plan.scenes.flatMap((scene:any)=>scene.shots.map((shot:any)=>({scene,shot})));
  for(const {scene,shot} of shots){
