@@ -218,6 +218,12 @@ try{
   decision:"approve",reviewer:"AIVEDIO CI reviewer",notes:"Approved after fixture QA passed."
  },200);
  assert.equal(delivered.status,"completed","Human approval should complete a QA-passed render delivery");
+ const deniedTransfer=await fetch(baseUrl+`/v1/projects/${project.id}/transfer-owner`,{method:"POST",headers:{"Authorization":"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({userId:second.user.id})});
+ assert.equal(deniedTransfer.status,403,"Only an administrator may transfer project ownership");
+ const transfer=await request("POST",`/v1/projects/${project.id}/transfer-owner`,{userId:second.user.id},200);
+ assert.equal(transfer.role,"owner","Admin ownership transfer must promote the target member");
+ const newOwnerRole=await fetch(baseUrl+`/v1/projects/${project.id}/role`,{headers:{"Authorization":"Bearer "+second.token}});
+ assert.equal((await newOwnerRole.json()).role,"owner","Transferred owner must receive owner role");
 
  console.log("AIVEDIO E2E smoke passed: project → plan → script review → QA/safety-gated assets → production cut → timeline → audio HITL gate → render snapshot → delivery review.");
  console.log("Note: generated media and worker render output are fixtures; provider generation and FFmpeg execution are not simulated as real work.");
