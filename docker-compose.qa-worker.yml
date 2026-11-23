@@ -1,0 +1,21 @@
+services:
+  aivedio-qa-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.qa-worker
+    image: aivedio-qa-worker:local
+    container_name: aivedio-qa-worker
+    profiles: ["qa-worker"]
+    env_file:
+      - qa-worker.env
+    environment:
+      MEDIA_ROOT: /app/media
+      QA_WORKER_POLL_SECONDS: ${QA_WORKER_POLL_SECONDS:-5}
+    volumes:
+      - qa-worker-media:/app/media
+    restart: unless-stopped
+    init: true
+
+volumes:
+  qa-worker-media:
+    name: aivedio-qa-worker-media
