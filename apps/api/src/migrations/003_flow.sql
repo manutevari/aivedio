@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS flow_characters(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',consistency_notes TEXT NOT NULL DEFAULT '',attributes JSONB NOT NULL DEFAULT '{}',reference_ids JSONB NOT NULL DEFAULT '[]',created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS flow_references(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,kind TEXT NOT NULL,uri TEXT NOT NULL,label TEXT NOT NULL,tags TEXT[] NOT NULL DEFAULT '{}',metadata JSONB NOT NULL DEFAULT '{}',created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS flow_characters_project_idx ON flow_characters(project_id);
+CREATE INDEX IF NOT EXISTS flow_references_project_idx ON flow_references(project_id,created_at DESC);

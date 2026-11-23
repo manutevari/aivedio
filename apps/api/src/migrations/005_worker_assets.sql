@@ -1,0 +1,15 @@
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS max_attempts INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS lease_owner TEXT;
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS safety_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS safety_reason TEXT;
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS quality_status TEXT NOT NULL DEFAULT 'not_run';
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS generation_jobs_claim_idx ON generation_jobs(status,safety_status,available_at,created_at);
+CREATE TABLE IF NOT EXISTS media_assets(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,scene_id UUID REFERENCES scenes(id) ON DELETE SET NULL,job_id UUID REFERENCES generation_jobs(id) ON DELETE SET NULL,kind TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',storage_provider TEXT NOT NULL,storage_key TEXT NOT NULL,mime_type TEXT NOT NULL,size_bytes BIGINT NOT NULL,checksum TEXT,metadata JSONB NOT NULL DEFAULT '{}',created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS media_assets_project_idx ON media_assets(project_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS media_assets_job_idx ON media_assets(job_id);
+CREATE TABLE IF NOT EXISTS generation_reviews(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),job_id UUID NOT NULL REFERENCES generation_jobs(id) ON DELETE CASCADE,stage TEXT NOT NULL,status TEXT NOT NULL,reason_codes JSONB NOT NULL DEFAULT '[]',reviewer TEXT,notes TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS generation_reviews_job_idx ON generation_reviews(job_id,created_at DESC);

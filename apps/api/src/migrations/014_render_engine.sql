@@ -1,0 +1,17 @@
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS manifest JSONB;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS attempt INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS max_attempts INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS lease_owner TEXT;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS checkpoint JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS qa_status TEXT;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS qa_report JSONB;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS reviewed_by TEXT;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS review_notes TEXT;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS output_checksum TEXT;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS output_size_bytes BIGINT;
+ALTER TABLE render_jobs ADD COLUMN IF NOT EXISTS stage TEXT NOT NULL DEFAULT 'queued';
+CREATE INDEX IF NOT EXISTS render_jobs_claim_idx ON render_jobs(status,available_at,created_at);
+CREATE INDEX IF NOT EXISTS render_jobs_lease_idx ON render_jobs(lease_expires_at) WHERE lease_owner IS NOT NULL;

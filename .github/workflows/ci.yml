@@ -1,0 +1,59 @@
+name: AIVEDIO CI
+on:
+  push:
+    branches: [main, feature/phase1-foundation]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aivedio
+          POSTGRES_PASSWORD: aivedio_ci
+          POSTGRES_DB: aivedio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aivedio -d aivedio_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://aivedio:aivedio_ci@localhost:5432/aivedio_test
+      AIVEDIO_SESSION_SECRET: ci-session-secret-at-least-32-characters-long
+      AIVEDIO_BOOTSTRAP_ADMIN_KEY: ci-bootstrap-key-at-least-32-characters-long
+      AIVEDIO_ALLOW_SELF_REGISTRATION: "true"
+      AIVEDIO_E2E_PORT: 3419
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+      - name: Apply migrations to disposable CI database
+        run: pnpm --filter @aivedio/api test:migrate
+      - name: Authentication security tests
+        run: pnpm --filter @aivedio/api test:security
+      - name: API production workflow E2E smoke
+        run: pnpm --filter @aivedio/api test:e2e
+      - name: Python syntax check
+        run: |
+          python -m compileall -q apps/streamlit apps/audio-worker apps/qa-worker
+      - name: Check Streamlit requirements
+        run: |
+          python -m pip install --dry-run -r apps/streamlit/requirements.txt

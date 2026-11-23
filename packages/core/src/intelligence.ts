@@ -1,0 +1,19 @@
+export type CreativeIntent="video"|"film"|"animation"|"image"|"music"|"voice"|"editing"|"multimedia"|"unknown";
+export interface CreativeBrief {intent:CreativeIntent;mood:string[];genre:string[];audience:string|null;durationSeconds:number|null;aspectRatio:string|null;resolution:string|null;language:string|null;deliverables:string[];constraints:string[];normalizedPrompt:string;clarificationNeeded:string[];confidence:number}
+export function analyzeCreativeBrief(text:string):CreativeBrief {
+ const t=text.toLowerCase();let intent:CreativeIntent="unknown";
+ if(/documentary|film|movie|cinema|short film/.test(t))intent="film";else if(/video|reel|shorts|youtube|ad|advert/.test(t))intent="video";else if(/animation|animated|cartoon/.test(t))intent="animation";else if(/image|picture|poster|thumbnail|illustration/.test(t))intent="image";else if(/song|music|soundtrack|instrumental|beat/.test(t))intent="music";else if(/voice.?over|narration|speech|dialogue/.test(t))intent="voice";else if(/edit|editing|cut|transition/.test(t))intent="editing";else if(/multimedia|all media/.test(t))intent="multimedia";
+ const moods=["happy","sad","emotional","inspiring","dramatic","dark","mysterious","romantic","funny","epic","calm","energetic","nostalgic","hopeful","tense","peaceful","thrilling"].filter(x=>t.includes(x));
+ const genres=["documentary","cinematic","sci-fi","fantasy","horror","comedy","drama","romance","action","thriller","educational","commercial","anime","realistic","surreal"].filter(x=>t.includes(x));
+ const dm=t.match(/(\d+(?:\.\d+)?)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)/);let durationSeconds:number|null=null;if(dm?.[1]&&dm[2]){const n=+dm[1],u=dm[2];durationSeconds=/hour|hr/.test(u)?n*3600:/min/.test(u)?n*60:n;}
+ const rm=t.match(/(\d{1,2})\s*:\s*(\d{1,2})/);const aspectRatio=rm?.[0]?rm[0].replace(/\s/g,""):t.includes("vertical")?"9:16":t.includes("square")?"1:1":t.includes("landscape")?"16:9":null;
+ const resolution=(t.match(/\b(4k|8k|1080p|720p|1440p|480p)\b/)||[])[1]?.toUpperCase()??null;
+ const language=(t.match(/\b(hindi|english|spanish|french|japanese|korean|arabic|urdu)\b/)||[])[1]??null;
+ const audience=(t.match(/(?:for|target(?:ing)?|audience)\s+(children|kids|students|families|professionals|general audience|adults)/)||[])[1]??null;
+ const deliverables=[intent==="unknown"?"creative output":intent];if(/subtitle|caption/.test(t))deliverables.push("subtitles");if(/voice.?over|narration/.test(t))deliverables.push("voiceover");if(/music|soundtrack|sfx|sound effect/.test(t))deliverables.push("audio");
+ const clarificationNeeded=[];if(intent==="unknown")clarificationNeeded.push("creative intent");if(durationSeconds===null&&["video","film","animation","multimedia"].includes(intent))clarificationNeeded.push("duration");if(aspectRatio===null&&["video","film","animation"].includes(intent))clarificationNeeded.push("aspect ratio");
+ const confidence=Math.min(.96,.45+(intent!=="unknown"?.25:0)+(moods.length?.08:0)+(genres.length?.08:0)+(durationSeconds!==null?.05:0)+(aspectRatio!==null?.04:0));
+ return {intent,mood:[...new Set(moods)],genre:[...new Set(genres)],audience,durationSeconds,aspectRatio,resolution,language,deliverables,constraints:[],normalizedPrompt:text.trim(),clarificationNeeded,confidence};
+}
+export interface ContextItem{id:string;content:string;source:string;tags:string[];createdAt:string;score:number}
+export function optimizeContext(items:ContextItem[],maxChars=12000){const map=new Map<string,ContextItem>();for(const x of items){const k=x.content.trim().toLowerCase();if(!map.has(k)||map.get(k)!.score<x.score)map.set(k,x)}const ranked=[...map.values()].sort((a,b)=>b.score-a.score);let n=0;const selected:ContextItem[]=[];for(const x of ranked){if(n+x.content.length>maxChars)continue;selected.push(x);n+=x.content.length}return{items:selected,totalChars:items.reduce((s,x)=>s+x.content.length,0),selectedChars:n,removed:items.length-selected.length}}

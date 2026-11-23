@@ -1,0 +1,4 @@
+import test from "node:test";import assert from "node:assert/strict";import {AuthRateLimiter} from "../src/auth-rate-limit.js";
+test("limits attempts per key and returns retry window",()=>{const l=new AuthRateLimiter(10);assert.equal(l.allow("ip",2,1000,100).allowed,true);assert.equal(l.allow("ip",2,1000,200).allowed,true);const d=l.allow("ip",2,1000,300);assert.equal(d.allowed,false);assert.equal(d.retryAfterMs,800)});
+test("resets expired buckets",()=>{const l=new AuthRateLimiter(10);assert.equal(l.allow("ip",1,100,0).allowed,true);assert.equal(l.allow("ip",1,100,50).allowed,false);assert.equal(l.allow("ip",1,100,101).allowed,true)});
+test("caps memory by evicting oldest key",()=>{const l=new AuthRateLimiter(2);l.allow("a",1,1000,0);l.allow("b",1,1000,0);l.allow("c",1,1000,0);assert.equal(l.allow("a",1,1000,1).allowed,true)});
