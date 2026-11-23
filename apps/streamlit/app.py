@@ -44,8 +44,18 @@ if not st.session_state.aivedio_session:
                 session=api("/v1/auth/login","POST",{"email":login_email,"password":login_password})
                 st.session_state.aivedio_session=session["token"]
                 st.rerun()
-            except Exception:
-                st.error("Sign-in failed. Check your credentials.")
+            except requests.HTTPError as exc:
+                status=exc.response.status_code if exc.response is not None else None
+                if status==401:
+                    st.error("Sign-in failed: the account/email or password is incorrect, or the account is disabled.")
+                elif status==429:
+                    st.error("Too many sign-in attempts. Please wait and try again.")
+                elif status and status>=500:
+                    st.error("The AIVEDIO API is having a server error. Check API health and deployment logs.")
+                else:
+                    st.error(f"Sign-in request failed (HTTP {status or 'unknown'}). Check API URL and deployment.")
+            except requests.RequestException:
+                st.error("Cannot reach the AIVEDIO API. Check AIVEDIO_API_URL and API availability.")
     with auth_tab[1]:
         with st.form("register_form"):
             register_email=st.text_input("Email")
