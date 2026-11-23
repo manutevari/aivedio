@@ -42,6 +42,7 @@ export async function applyApprovedBriefPatch(projectId:string,runId:string,user
  const updated=await client.query("UPDATE projects SET creative_brief=$2 WHERE id=$1 AND creative_brief IS NOT DISTINCT FROM $3 RETURNING id",[projectId,after,before]);if(!updated.rowCount)throw new Error("Project brief changed since this patch was generated; rerun the agent pipeline");
  await client.query("UPDATE agent_pipeline_runs SET status='applied',applied_at=now(),updated_at=now() WHERE id=$1",[runId]);
  await client.query("INSERT INTO project_memory(project_id,kind,content,tags,importance) VALUES($1,'agent_patch',$2,$3,0.8)",[projectId,JSON.stringify({runId,target:patch.target,before,after,summary:patch.summary,appliedBy:userId}),["agent","patch","hitl"]]);
+ await client.query("INSERT INTO query_history(project_id,query,intent,response_summary) VALUES($1,$2,'agent_patch',$3)",[projectId,"Apply HITL agent patch "+runId,"Applied approved patch to creative brief by user "+userId]);
  await client.query("COMMIT");return{runId,status:"applied",target:patch.target,summary:patch.summary};
  }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
 }
