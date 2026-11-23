@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: aivedio-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: AIVEDIO_SESSION_SECRET
+        generateValue: true
+      - key: AIVEDIO_BOOTSTRAP_ADMIN_KEY
+        generateValue: true
+      - key: AIVEDIO_ALLOW_SELF_REGISTRATION
+        value: "true"
+      - key: AIVEDIO_ALLOWED_ORIGINS
+        value: https://aivedio.streamlit.app
+      - key: AIVEDIO_WEB_URL
+        value: https://aivedio.streamlit.app
+      - key: AIVEDIO_SITE_URL
+        value: https://aivedio.streamlit.app
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_FREE_ONLY
+        value: "true"
+      - key: OPENROUTER_AGENT_MODEL
+        value: openrouter/auto
+      - key: LANGSMITH_TRACING
+        value: "false"
+      - key: LANGCHAIN_TRACING_V2
+        value: "false"
+      - key: LANGSMITH_HIDE_INPUTS
+        value: "true"
+      - key: LANGSMITH_HIDE_OUTPUTS
+        value: "true"
