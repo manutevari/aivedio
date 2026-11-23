@@ -1,0 +1,12 @@
+{
+  "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter @aivedio/web build",
+  "outputDirectory": "apps/web/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "installCommand": "pnpm install --no-frozen-lockfile"
+}
