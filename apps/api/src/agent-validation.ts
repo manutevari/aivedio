@@ -2,7 +2,7 @@ export type AgentRole="Improvisor"|"Implementation Agent"|"Patcher"|"Auditor";
 export type JsonObject=Record<string,unknown>;
 const isObject=(v:unknown):v is JsonObject=>!!v&&typeof v==="object"&&!Array.isArray(v);
 const isString=(v:unknown)=>typeof v==="string";
-const isArray=(v:unknown)=>Array.isArray(v);
+const isArray=(v:unknown):v is unknown[]=>Array.isArray(v);
 const fail=(role:string,detail:string):never=>{throw new Error(role+" output failed schema validation: "+detail)};
 export function parseAgentJson(role:AgentRole,raw:string):JsonObject{
  let text=raw.trim();
