@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import {timingSafeEqual} from "node:crypto";
 import {loadApiSecurityConfig} from "./security-config.js";
+import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember,AuthUser} from "./auth.js";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
 import {createAssetQualityJob,listQualityJobs,listQualityReports,getQualityReport,runContinuityReview,applySafetyReview,listSafetyReviews} from './quality.js';
 import {enrichCreativePlan,listScriptPackages,getScriptPackage,reviewScriptPackage} from './scriptwriting.js';
@@ -31,21 +32,34 @@ const apiToken=securityConfig.apiToken;
 const allowedOrigins=securityConfig.allowedOrigins;
 app.addHook("onRequest",async(request,reply)=>{
  const origin=request.headers.origin;
- if(origin&&allowedOrigins.includes(origin)){
-  reply.header("Access-Control-Allow-Origin",origin);
-  reply.header("Vary","Origin");
-  reply.header("Access-Control-Allow-Headers","Authorization,Content-Type");
-  reply.header("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");
- }
+ if(origin&&allowedOrigins.includes(origin)){reply.header("Access-Control-Allow-Origin",origin);reply.header("Vary","Origin");reply.header("Access-Control-Allow-Headers","Authorization,Content-Type");reply.header("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");}
  if(request.method==="OPTIONS")return reply.code(204).send();
- if(request.url==="/health")return;
- if(apiToken){
-  const received=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
-  const a=Buffer.from(received),b=Buffer.from(apiToken);
-  if(a.length!==b.length||!timingSafeEqual(a,b))return reply.code(401).send({error:"Unauthorized"});
+ if(request.url==="/health"||request.url==="/ready")return;
+ const pathname=request.url.split("?")[0];
+ if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap"].includes(pathname))return;
+ const bearer=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
+ let user:AuthUser|null=null;
+ try{user=await authenticateSession(bearer)}catch(error){request.log.error(error);return reply.code(500).send({error:"Authentication service unavailable"})}
+ if(!user)return reply.code(401).send({error:"Session required"});
+ (request as any).user=user;
+ const parts=pathname.split("/").filter(Boolean);
+ let projectId=parts[0]==="v1"&&parts[1]==="projects"?parts[2]:undefined;
+ const queryProject=(request.query as any)?.projectId;if(!projectId&&queryProject)projectId=String(queryProject);
+ if(!projectId){
+  const tableByType:Record<string,string>={assets:"media_assets","generation-jobs":"generation_jobs","render-jobs":"render_jobs",scenes:"scenes",subtitles:"subtitles"};
+  const kind=parts[1],id=parts[2]??parts[1],table=tableByType[kind];
+  if(table&&id){try{const r=await requireDb().query("SELECT project_id FROM "+table+" WHERE id=$1",[id]);projectId=r.rows[0]?.project_id}catch{}}
+  if(kind==="timeline"&&parts[2]==="tracks"&&parts[3]){try{const r=await requireDb().query("SELECT project_id FROM timeline_tracks WHERE id=$1",[parts[3]]);projectId=r.rows[0]?.project_id}catch{}}
+  if(kind==="timeline"&&parts[2]==="clips"&&parts[3]){try{const r=await requireDb().query("SELECT t.project_id FROM timeline_clips c JOIN timeline_tracks t ON t.id=c.track_id WHERE c.id=$1",[parts[3]]);projectId=r.rows[0]?.project_id}catch{}}
+  if(kind==="workflows"&&parts[2]){try{const r=await requireDb().query("SELECT project_id FROM workflow_runs WHERE id=$1",[parts[2]]);projectId=r.rows[0]?.project_id??undefined}catch{}}
  }
-});
-app.post("/v1/projects/:id/production-cuts/:cutId/audio-plans",async(request,reply)=>{try{const p=request.params as {id:string;cutId:string};const b=request.body as {assetAssignments?:Record<string,string>;createdBy?:string};return reply.status(201).send(await createAudioPlan(p.id,p.cutId,b?.assetAssignments??{},b?.createdBy))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+ if(projectId){
+  const role=await getProjectRole(user,projectId);if(!role)return reply.code(404).send({error:"Project not found"});
+  const readOnly=request.method==="GET",reviewerAction=/\/review$|safety-review|\/approve$/.test(pathname);
+  const canEdit=["owner","editor"].includes(role),canReview=["owner","editor","reviewer"].includes(role);
+  if(!readOnly&&!(reviewerAction?canReview:canEdit))return reply.code(403).send({error:"Insufficient project role"});
+ }
+});app.post("/v1/projects/:id/production-cuts/:cutId/audio-plans",async(request,reply)=>{try{const p=request.params as {id:string;cutId:string};const b=request.body as {assetAssignments?:Record<string,string>;createdBy?:string};return reply.status(201).send(await createAudioPlan(p.id,p.cutId,b?.assetAssignments??{},b?.createdBy))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/audio-plans",async(request)=>listAudioPlans((request.params as {id:string}).id));
 app.get("/v1/projects/:id/audio-plans/:planId",async(request,reply)=>{const p=request.params as {id:string;planId:string};const r=await getAudioPlan(p.id,p.planId);if(!r)return reply.status(404).send({error:"Audio plan not found"});return r});
 app.patch("/v1/projects/:id/audio-plans/:planId/cues/:cueId",async(request,reply)=>{try{const p=request.params as {id:string;planId:string;cueId:string};return await updateAudioCue(p.id,p.planId,p.cueId,request.body as any)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
@@ -117,8 +131,16 @@ app.post("/v1/render-jobs/:id/review",async(request,reply)=>{try{const b=request
 app.get("/v1/projects/:id/render-jobs",async(request)=>listRenderJobs((request.params as {id:string}).id));
 app.get("/v1/render-jobs/:id",async(request)=>getRenderJob((request.params as {id:string}).id));
 
-app.get("/v1/projects",async()=>listProjects());
-app.post("/v1/projects",async(request,reply)=>{const body=request.body as {title:string;mode?:string;target?:unknown;creativeBrief?:string};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});return reply.status(201).send(await createProject(body));});
+app.post("/v1/auth/bootstrap",async(request,reply)=>{try{const b=request.body as any;return reply.status(201).send(await bootstrapAdmin(b?.bootstrapKey,b?.email,b?.password,b?.displayName,request.headers["user-agent"],request.ip))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/auth/register",async(request,reply)=>{try{const b=request.body as any;return reply.status(201).send(await registerUser(b?.email,b?.password,b?.displayName,request.headers["user-agent"],request.ip))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/auth/login",async(request,reply)=>{try{const b=request.body as any;return await loginUser(b?.email,b?.password,request.headers["user-agent"],request.ip)}catch(e){return reply.status(401).send({error:"Invalid email or password"})}});
+app.get("/v1/auth/me",async(request)=>({user:(request as any).user}));
+app.post("/v1/auth/logout",async(request,reply)=>{const token=request.headers.authorization?.slice(7)??"";await revokeSession(token);return reply.code(204).send()});
+app.get("/v1/projects/:id/members",async(request,reply)=>{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(!role)return reply.code(404).send({error:"Project not found"});if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});return listProjectMembers(id)});
+app.post("/v1/projects/:id/members",async(request,reply)=>{try{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});const b=request.body as any;if(!["editor","reviewer","viewer"].includes(b?.role))return reply.code(400).send({error:"Invalid member role"});return reply.status(201).send(await addProjectMember(id,b.email,b.role,user.id))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.delete("/v1/projects/:id/members/:userId",async(request,reply)=>{const p=request.params as any;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,p.id);if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});if(!await removeProjectMember(p.id,p.userId))return reply.code(404).send({error:"Member not found"});return{removed:true}});
+app.get("/v1/projects",async(request)=>listProjects((request as any).user as AuthUser));
+app.post("/v1/projects",async(request,reply)=>{const body=request.body as {title:string;mode?:string;target?:unknown;creativeBrief?:string};if(!body?.title?.trim())return reply.status(400).send({error:"title is required"});const user=(request as any).user as AuthUser;const created=await createProject(body);await requireDb().query("UPDATE projects SET owner_user_id=$2 WHERE id=$1",[created.id,user.id]);await requireDb().query("INSERT INTO project_members(project_id,user_id,role) VALUES($1,$2,$3)",[created.id,user.id,"owner"]);return reply.status(201).send(created);});
 app.get("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await getProject(id);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
 app.patch("/v1/projects/:id",async(request,reply)=>{const {id}=request.params as {id:string};const p=await updateProject(id,request.body as Record<string,unknown>);if(!p)return reply.status(404).send({error:"Project not found"});return p;});
 app.get("/v1/projects/:id/scenes",async(request)=>listScenes((request.params as {id:string}).id));
