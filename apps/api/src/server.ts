@@ -50,16 +50,28 @@ app.addHook("preHandler",async(request,reply)=>{
  if(!user)return reply.code(401).send({error:"Session required"});
  (request as any).user=user;
  const parts=pathname.split("/").filter(Boolean);
- let projectId=parts[0]==="v1"&&parts[1]==="projects"?parts[2]:undefined;
- const queryProject=(request.query as any)?.projectId;const bodyProject=(request.body as any)?.projectId;if(!projectId&&queryProject)projectId=String(queryProject);if(!projectId&&bodyProject)projectId=String(bodyProject);
- if(!projectId){
-  const tableByType:Record<string,string>={assets:"media_assets","generation-jobs":"generation_jobs","render-jobs":"render_jobs",scenes:"scenes",subtitles:"subtitles"};
-  const kind=parts[1]??"",id=parts[2]??kind,table=tableByType[kind];
-  if(table&&id){try{const r=await requireDb().query("SELECT project_id FROM "+table+" WHERE id=$1",[id]);projectId=r.rows[0]?.project_id}catch{}}
-  if(kind==="timeline"&&parts[2]==="tracks"&&parts[3]){try{const r=await requireDb().query("SELECT project_id FROM timeline_tracks WHERE id=$1",[parts[3]]);projectId=r.rows[0]?.project_id}catch{}}
-  if(kind==="timeline"&&parts[2]==="clips"&&parts[3]){try{const r=await requireDb().query("SELECT t.project_id FROM timeline_clips c JOIN timeline_tracks t ON t.id=c.track_id WHERE c.id=$1",[parts[3]]);projectId=r.rows[0]?.project_id}catch{}}
-  if(kind==="workflows"&&parts[2]){try{const r=await requireDb().query("SELECT project_id FROM workflow_runs WHERE id=$1",[parts[2]]);projectId=r.rows[0]?.project_id??undefined}catch{}}
+ const pathProject=parts[0]==="v1"&&parts[1]==="projects"?parts[2]:undefined;
+ const queryProject=(request.query as any)?.projectId;const bodyProject=(request.body as any)?.projectId;
+ const explicitProject=pathProject??(queryProject?String(queryProject):undefined)??(bodyProject?String(bodyProject):undefined);
+ let resourceProject:string|undefined,resourceMissing=false;
+ const tableByType:Record<string,string>={assets:"media_assets","generation-jobs":"generation_jobs","render-jobs":"render_jobs",scenes:"scenes",subtitles:"subtitle_cues"};
+ const resourceKind=parts[1]??"",resourceId=parts[2];
+ const table=tableByType[resourceKind];
+ if(table&&resourceId&&resourceId!=="review"){
+  try{const r=await requireDb().query("SELECT project_id FROM "+table+" WHERE id=$1",[resourceId]);resourceProject=r.rows[0]?.project_id;resourceMissing=!resourceProject}catch{resourceMissing=true}
  }
+ if(resourceKind==="timeline"&&parts[2]==="tracks"&&parts[3]){
+  try{const r=await requireDb().query("SELECT project_id FROM timeline_tracks WHERE id=$1",[parts[3]]);resourceProject=r.rows[0]?.project_id;resourceMissing=!resourceProject}catch{resourceMissing=true}
+ }
+ if(resourceKind==="timeline"&&parts[2]==="clips"&&parts[3]){
+  try{const r=await requireDb().query("SELECT t.project_id FROM timeline_clips c JOIN timeline_tracks t ON t.id=c.track_id WHERE c.id=$1",[parts[3]]);resourceProject=r.rows[0]?.project_id;resourceMissing=!resourceProject}catch{resourceMissing=true}
+ }
+ if(resourceKind==="workflows"&&resourceId){
+  try{const r=await requireDb().query("SELECT project_id FROM workflow_runs WHERE id=$1",[resourceId]);resourceProject=r.rows[0]?.project_id??undefined;resourceMissing=!resourceProject}catch{resourceMissing=true}
+ }
+ if(resourceMissing)return reply.code(404).send({error:"Resource not found"});
+ if(resourceProject&&explicitProject&&resourceProject!==explicitProject)return reply.code(404).send({error:"Resource not found"});
+ let projectId=pathProject??resourceProject??explicitProject;
  if(projectId&&request.body&&typeof request.body==="object"&&(request.method==="POST"||request.method==="PUT"||request.method==="PATCH"))(request.body as any).createdBy=user.email;
  if(request.body&&typeof request.body==="object"&&/(review|approve|safety-review)$/.test(pathname))(request.body as any).reviewer=user.email;
  if(user.global_role!=="admin"){
