@@ -34,3 +34,17 @@ export async function getProjectRole(user:AuthUser,projectId:string){if(user.glo
 export async function addProjectMember(projectId:string,email:string,role:"editor"|"reviewer"|"viewer",addedBy:string){const e=validEmail(email),u=(await requireDb().query("SELECT id,email,display_name FROM users WHERE lower(email)=$1 AND disabled_at IS NULL",[e])).rows[0];if(!u)throw new Error("Account not found");const r=await requireDb().query("INSERT INTO project_members(project_id,user_id,role,added_by) VALUES($1,$2,$3,$4) ON CONFLICT(project_id,user_id) DO UPDATE SET role=excluded.role RETURNING project_id,user_id,role",[projectId,u.id,role,addedBy]);return{...r.rows[0],email:u.email,display_name:u.display_name}}
 export async function listProjectMembers(projectId:string){return(await requireDb().query("SELECT pm.user_id,pm.role,pm.created_at,u.email,u.display_name FROM project_members pm JOIN users u ON u.id=pm.user_id WHERE pm.project_id=$1 ORDER BY pm.role,u.email",[projectId])).rows}
 export async function removeProjectMember(projectId:string,userId:string){const r=await requireDb().query("DELETE FROM project_members WHERE project_id=$1 AND user_id=$2 AND role<>'owner' RETURNING user_id",[projectId,userId]);return Boolean(r.rowCount)}
+
+export async function transferProjectOwnership(projectId:string,newOwnerId:string,adminId:string){
+ const target=(await requireDb().query("SELECT id,email,display_name FROM users WHERE id=$1 AND disabled_at IS NULL",[newOwnerId])).rows[0];
+ if(!target)throw new Error("Active user not found");
+ const client=await requireDb().connect();
+ try{
+  await client.query("BEGIN");
+  await client.query("UPDATE project_members SET role=$3 WHERE project_id=$1 AND role=$4 AND user_id<>$2",[projectId,newOwnerId,"editor","owner"]);
+  await client.query("INSERT INTO project_members(project_id,user_id,role,added_by) VALUES($1,$2,$3,$4) ON CONFLICT(project_id,user_id) DO UPDATE SET role=excluded.role",[projectId,newOwnerId,"owner",adminId]);
+  await client.query("UPDATE projects SET owner_user_id=$2 WHERE id=$1",[projectId,newOwnerId]);
+  await client.query("COMMIT");
+  return{projectId,userId:target.id,email:target.email,display_name:target.display_name,role:"owner"};
+ }catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}
+}
