@@ -10,8 +10,23 @@ def api(path,method="GET",data=None):
     token=st.session_state.get("aivedio_session","")
     headers={"Authorization":"Bearer "+token} if token else {}
     response=requests.request(method,API+path,json=data,headers=headers,timeout=20)
-    response.raise_for_status()
-    return response.json() if response.content else None
+    # Parse defensively: reverse proxies and misconfigured deployments can return
+    # empty bodies or HTML instead of the API's JSON contract.
+    body=response.text.strip()
+    if response.status_code >= 400:
+        try:
+            payload=response.json()
+            detail=payload.get("error") or payload.get("message") or body[:300] or "No response body"
+        except ValueError:
+            detail=body[:300] or "No response body"
+        raise requests.HTTPError(f"HTTP {response.status_code}: {detail}",response=response)
+    if not body:
+        return None
+    try:
+        return response.json()
+    except ValueError as exc:
+        content_type=response.headers.get("content-type","unknown")
+        raise RuntimeError(f"API returned a non-JSON response (HTTP {response.status_code}, content-type {content_type}). Check API URL and deployment/proxy logs.") from exc
 
 def safe(path,default):
     try:
