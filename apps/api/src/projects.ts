@@ -1,5 +1,6 @@
 import {requireDb} from "./db.js";
-export async function listProjects(){return (await requireDb()!.query("SELECT * FROM projects ORDER BY updated_at DESC")).rows;}
+import type {AuthUser} from "./auth.js";
+export async function listProjects(user:AuthUser){if(user.global_role==="admin")return(await requireDb().query("SELECT * FROM projects ORDER BY updated_at DESC")).rows;return(await requireDb().query("SELECT p.* FROM projects p JOIN project_members pm ON pm.project_id=p.id WHERE pm.user_id=$1 ORDER BY p.updated_at DESC",[user.id])).rows;}
 export async function createProject(input:{title:string;mode?:string;target?:unknown;creativeBrief?:string}){
  return (await requireDb()!.query("INSERT INTO projects(title,mode,target,creative_brief) VALUES($1,$2,$3,$4) RETURNING *",[input.title,input.mode??"flow",input.target??{},input.creativeBrief??null])).rows[0];
 }
