@@ -221,6 +221,7 @@
 - [ ] Session management/revocation UI and account recovery
 - [ ] Admin user management and invitation flow
 - [x] Studio project members panel (invite existing account/remove member) in React and Streamlit (CI pending latest commit)
+- [x] Admin-only atomic ownership transfer, including legacy project recovery
 - [ ] Derive all audit actors from session identity and remove caller-supplied actor fields
 - [ ] Security headers/CSP and production secrets/rotation documentation
 - [ ] Migration rehearsal, release checklist and rollback plan
