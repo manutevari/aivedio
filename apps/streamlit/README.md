@@ -10,7 +10,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Configure `AIVEDIO_API_URL` (default `http://localhost:3000`) to connect to the Node API. The UI gracefully shows offline status if the API is unavailable. It reads the API base URL from Streamlit secrets first, then the `AIVEDIO_API_URL` environment variable.
+Configure `AIVEDIO_API_URL` to connect to the Node API. The default `http://localhost:3000` is for local development only and will fail on Streamlit Cloud because localhost refers to the Streamlit container itself. The sign-in page now shows a configuration warning and API health status.
 
 The Streamlit UI includes API-backed sign-in, account creation (if enabled by the API), forgot-password and reset-password flows, project selection, and agent-pipeline HITL controls. Other production features may still be incomplete.
 
