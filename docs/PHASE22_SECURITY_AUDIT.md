@@ -34,3 +34,7 @@
 - [x] E2E regression: nested asset-analysis operation rejects a foreign asset ID.
 - [ ] Continue audit of remaining nested project-scoped child IDs and confirm all service-level SQL validates project ownership.
 - [ ] Test direct resource cross-project attempts for each mapped resource type.
+
+## Additional regression fix
+- [x] Generation-job human review was passing a JS array to a JSONB reason-code column; serialize reason codes as JSON for both generation review and asset release review.
+- [x] E2E regression now verifies reviewer approval succeeds and reviewer identity is session-bound.
