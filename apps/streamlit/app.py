@@ -2,7 +2,7 @@ import os
 import requests
 import streamlit as st
 
-API=os.getenv("AIVEDIO_API_URL","http://localhost:3000").rstrip("/")
+API=str(st.secrets.get("AIVEDIO_API_URL",os.getenv("AIVEDIO_API_URL","http://localhost:3000"))).rstrip("/")
 st.set_page_config(page_title="AIVEDIO Studio",page_icon="🎬",layout="wide")
 st.markdown("""<style>.stApp{background:#080b14;color:#e7eaf5}[data-testid=stSidebar]{background:#0b0f1a}div[data-testid=stMetric]{background:#111827;border:1px solid #273149;padding:12px;border-radius:12px}</style>""",unsafe_allow_html=True)
 
