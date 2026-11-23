@@ -167,6 +167,19 @@
 - [x] CI green: typecheck, build, Python syntax and dependency dry-run
 - [ ] Secure user/session authentication and role-based review authorization
 - [ ] API ownership/authorization audit
-- [ ] E2E tests for project-to-delivery workflow
+- [x] Deterministic API E2E smoke: project → plan → script review → QA/safety-gated fixture assets → production cut → timeline → audio HITL gate → render snapshot → delivery review\n- [ ] Real provider generation and FFmpeg worker integration tests
 - [ ] Migration rehearsal and worker/render integration tests
 - [ ] Release deployment and rollback plan
+
+## Phase 19 — End-to-End Integration Testing
+- [x] Checksum-tracked transactional migration runner for controlled/CI databases
+- [x] CI disposable PostgreSQL 16 service and migration execution
+- [x] API bearer-token protection smoke test
+- [x] Project/plan creation and approval through API
+- [x] Deterministic script fixture and human-review endpoint
+- [x] Asset release, technical QA and safety-gate fixture validation
+- [x] Production cut compile/apply and timeline manifest validation
+- [x] Audio plan HITL gate verification
+- [x] Render manifest snapshot and delivery review gate validation
+- [ ] Real provider, asset/audio/QA/render workers, FFmpeg, storage and UI E2E
+- [ ] Authentication/RBAC and project ownership authorization audit
