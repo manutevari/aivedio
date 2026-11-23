@@ -53,6 +53,8 @@ app.addHook("onRequest",async(request,reply)=>{
   if(kind==="timeline"&&parts[2]==="clips"&&parts[3]){try{const r=await requireDb().query("SELECT t.project_id FROM timeline_clips c JOIN timeline_tracks t ON t.id=c.track_id WHERE c.id=$1",[parts[3]]);projectId=r.rows[0]?.project_id}catch{}}
   if(kind==="workflows"&&parts[2]){try{const r=await requireDb().query("SELECT project_id FROM workflow_runs WHERE id=$1",[parts[2]]);projectId=r.rows[0]?.project_id??undefined}catch{}}
  }
+ if(request.body&&typeof request.body==="object"&&/(review|approve|safety-review)$/.test(pathname)){(request.body as any).reviewer=user.email;(request.body as any).createdBy=user.email;}
+ if(!projectId&&request.method!=="GET"&&pathname!=="/v1/projects"&&pathname!=="/v1/auth/logout"&&user.global_role!=="admin")return reply.code(403).send({error:"Admin role required for global mutation"});
  if(projectId){
   const role=await getProjectRole(user,projectId);if(!role)return reply.code(404).send({error:"Project not found"});
   const readOnly=request.method==="GET",reviewerAction=/\/review$|safety-review|\/approve$/.test(pathname);
