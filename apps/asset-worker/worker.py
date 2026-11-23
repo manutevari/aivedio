@@ -73,7 +73,8 @@ def extract_keyframes(path,asset_id):
 def claim():
  with db() as conn:
   with conn.cursor() as cur:
-   cur.execute("WITH c AS (SELECT id FROM asset_analysis_jobs WHERE status='queued' AND available_at<=now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE asset_analysis_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM c WHERE j.id=c.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
+   cur.execute("UPDATE asset_analysis_jobs SET status='failed',error=COALESCE(error,'Worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE status='processing' AND lease_expires_at<now() AND attempt>=max_attempts")
+   cur.execute("WITH c AS (SELECT id FROM asset_analysis_jobs WHERE ((status='queued' AND available_at<=now()) OR (status='processing' AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE asset_analysis_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM c WHERE j.id=c.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
 def process(job):
  with db() as conn:
   with conn.cursor() as cur:cur.execute("SELECT * FROM media_assets WHERE id=%s AND project_id=%s",(job["asset_id"],job["project_id"]));asset=cur.fetchone()
