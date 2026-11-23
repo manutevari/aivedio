@@ -164,7 +164,7 @@
 - [x] Harden render worker path resolution against symlink escape
 - [x] Recover expired/missing render leases
 - [x] Add GitHub Actions CI workflow (typecheck, build, Python syntax)
-- [x] CI green: typecheck, build, Python syntax and dependency dry-run
+- [x] CI green: typecheck and build (previous workflow); Python syntax and dependency dry-run pending re-verification with database E2E
 - [ ] Secure user/session authentication and role-based review authorization
 - [ ] API ownership/authorization audit
 - [x] Deterministic API E2E smoke: project → plan → script review → QA/safety-gated fixture assets → production cut → timeline → audio HITL gate → render snapshot → delivery review\n- [ ] Real provider generation and FFmpeg worker integration tests
