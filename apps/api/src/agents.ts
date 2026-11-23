@@ -27,7 +27,7 @@ function agentTrace(role:AgentRole,projectId:string){
 }
 function normalizeBrief(value:unknown){return typeof value==="string"?value.slice(0,20000):""}
 
-export async function runAgentPipeline(projectId:string,userId:string,input:Json){
+async function runAgentPipelineInternal(projectId:string,userId:string,input:Json){
  const project=(await requireDb().query("SELECT id,title,creative_brief,mode,target FROM projects WHERE id=$1",[projectId])).rows[0];if(!project)throw new Error("Project not found");
  const brief=normalizeBrief(input.brief)||normalizeBrief(project.creative_brief);
  if(!brief.trim())throw new Error("Provide a creative brief or update the project brief first");
@@ -44,6 +44,8 @@ export async function runAgentPipeline(projectId:string,userId:string,input:Json
  try{await client.query("BEGIN");await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[projectId]);row=(await client.query("INSERT INTO agent_pipeline_runs(project_id,created_by,input,improvisor,implementation_plan,audit,patch,status) VALUES($1,$2,$3,$4,$5,$6,$7,'awaiting_approval') RETURNING *",[projectId,userId,context,improvisor,implementation,audit,patch])).rows[0];await client.query("COMMIT")}catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
  return row;
 }
+const tracedPipeline=traceable(async(args:{projectId:string;userId:string;input:Json})=>runAgentPipelineInternal(args.projectId,args.userId,args.input),{name:"AIVEDIO Agent Pipeline",run_type:"chain",tracingEnabled:process.env.LANGSMITH_TRACING?.toLowerCase()==="true",metadata:{framework:"langchain",provider:"openrouter",pipeline:"improvisor-implementation-patcher-auditor"},tags:["aivedio","agent-pipeline","hitl"]});
+export async function runAgentPipeline(projectId:string,userId:string,input:Json){return tracedPipeline({projectId,userId,input})}
 export async function listAgentRuns(projectId:string){return(await requireDb().query("SELECT id,status,input,improvisor,implementation_plan,audit,patch,human_decision,human_notes,decided_at,applied_at,created_at,updated_at FROM agent_pipeline_runs WHERE project_id=$1 ORDER BY created_at DESC",[projectId])).rows}
 export async function getAgentRun(projectId:string,runId:string){return(await requireDb().query("SELECT * FROM agent_pipeline_runs WHERE project_id=$1 AND id=$2",[projectId,runId])).rows[0]??null}
 export async function decideAgentRun(projectId:string,runId:string,userId:string,decision:"approve"|"reject",notes=""){
