@@ -3,11 +3,11 @@ import {HumanMessage,SystemMessage} from "@langchain/core/messages";
 import {traceable} from "langsmith/traceable";
 import {requireDb} from "./db.js";
 import {parseAgentJson,type JsonObject,type AgentRole} from "./agent-validation.js";
-import {resolveAgentProvider,agentProviderStatus} from "./agent-provider-router.js";
+import {resolveAgentProvider} from "./agent-provider-router.js";
 
 type Json=JsonObject;
-const apiKey=()=>process.env.OPENROUTER_API_KEY?.trim();
-const model=()=>process.env.OPENROUTER_AGENT_MODEL?.trim()||"openrouter/auto";
+const provider=()=>resolveAgentProvider();
+const model=()=>provider().model;
 const prompts:Record<AgentRole,string>={
  "Improvisor":"You are AIVEDIO Improvisor: generate useful, grounded creative and production improvements. Return JSON {ideas:[{title,description,impact,risks}],recommendedDirection,assumptions}. Never claim facts unsupported by input.",
  "Implementation Agent":"You are AIVEDIO Implementation Agent. Convert the approved direction into a practical staged plan. Return JSON {steps:[{id,title,description,ownerRole,dependencies,acceptanceCriteria}],requirements,risks,rollback}. Avoid actions requiring external credentials or irreversible operations.",
@@ -15,8 +15,8 @@ const prompts:Record<AgentRole,string>={
  "Auditor":"You are a strict independent auditor. Independently inspect the brief patch AND implementation plan, including the proposed change set. Return JSON {verdict:'pass'|'needs_changes'|'fail',score:0-100,findings:[{severity:'critical'|'high'|'medium'|'low',finding,evidence,recommendation}],requiredHumanChecks,summary}. Never rubber-stamp. If proposal is vague, unsafe, unsupported or has critical issues, fail it."
 };
 function agentClient(role:string){
- const key=apiKey();if(!key)throw new Error("OPENROUTER_API_KEY is not configured on the AIVEDIO API server");
- return new ChatOpenAI({apiKey:key,model:model(),temperature:0.2,timeout:60000,maxRetries:2,configuration:{baseURL:"https://openrouter.ai/api/v1",defaultHeaders:{"HTTP-Referer":process.env.AIVEDIO_SITE_URL||"https://aivedio.local","X-Title":"AIVEDIO "+role}}});
+ const config=provider();
+ return new ChatOpenAI({apiKey:config.apiKey,model:config.model,temperature:0.2,timeout:60000,maxRetries:2,configuration:{baseURL:config.baseURL,defaultHeaders:{"HTTP-Referer":process.env.AIVEDIO_SITE_URL||"https://aivedio.local","X-Title":"AIVEDIO "+role}}});
 }
 function agentTrace(role:AgentRole,projectId:string){
  return traceable(async(input:unknown)=>{
