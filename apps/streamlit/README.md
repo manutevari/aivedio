@@ -10,7 +10,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Configure `AIVEDIO_API_URL` (default `http://localhost:3000`) to connect to the Node API. The UI gracefully shows offline status if the API is unavailable.
+Configure `AIVEDIO_API_URL` (default `http://localhost:3000`) to connect to the Node API. The UI gracefully shows offline status if the API is unavailable. It reads the API base URL from Streamlit secrets first, then the `AIVEDIO_API_URL` environment variable.
 
 This is a UI foundation only: generation, persistent projects, authentication, and production safety classification are not yet connected.
 
