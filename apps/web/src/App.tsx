@@ -10,7 +10,7 @@ const tabs=["Overview","Plan","Script","Storyboard","Assets","Flow Library","Tim
 const modes=["Simple Mode","Flow Mode","Pro Mode","Studio Mode"];
 const req=(method:string,body?:unknown):RequestInit=>({method,...(body===undefined?{}:{body:JSON.stringify(body)})});
 async function api<T=any>(url:string,init?:RequestInit):Promise<T>{
- const r=await fetch(API+url,{...init,headers:{"content-type":"application/json",...(init?.headers??{})}});
+ const token=sessionStorage.getItem("aivedio-session");const r=await fetch(API+url,{...init,headers:{"content-type":"application/json",...(token?{Authorization:"Bearer "+token}:{}),...(init?.headers??{})}});
  if(!r.ok){let detail="";try{detail=await r.text()}catch{}throw new Error(detail||r.statusText||"API request failed")}
  return r.status===204?null as T:r.json();
 }
@@ -19,6 +19,8 @@ function Status({value}:{value:any}){const s=String(value??"unknown").toLowerCas
 function Card({title,sub,actions,children}:{title:string;sub?:string;actions?:any;children:any}){return <section className="studio-card"><header className="card-header"><div><h3>{title}</h3>{sub&&<p>{sub}</p>}</div>{actions}</header>{children}</section>}
 function Empty({title,detail}:{title:string;detail:string}){return <div className="empty"><span>✧</span><b>{title}</b><p>{detail}</p></div>}
 export default function App(){
+ const[session,setSession]=useState(()=>sessionStorage.getItem("aivedio-session")||"");
+ const[email,setEmail]=useState(""),[password,setPassword]=useState(""),[authBusy,setAuthBusy]=useState(false),[authError,setAuthError]=useState("");
  const[mode,setMode]=useState("Flow Mode"),[tab,setTab]=useState("Overview");
  const[projects,setProjects]=useState<Project[]>([]),[projectId,setProjectId]=useState(""),[projectTitle,setProjectTitle]=useState("My Production"),[brief,setBrief]=useState("");
  const[scenes,setScenes]=useState<Scene[]>([]),[sceneId,setSceneId]=useState(""),[prompt,setPrompt]=useState("");
@@ -71,7 +73,7 @@ export default function App(){
    if(!audioId&&au[0]?.id)setAudioId(au[0].id);
   }catch(e){setOffline(true);setError(e instanceof Error?e.message:String(e))}
  },[projectId,sceneId,planId,scriptId,cutId,audioId,loadProjects]);
- useEffect(()=>{void refresh()},[]);
+ useEffect(()=>{if(session)void refresh()},[session]);
  useEffect(()=>{if(projectId)void refresh()},[projectId]);
  useEffect(()=>{if(scene)setPrompt(scene.prompt??"")},[sceneId,scene?.prompt]);
  useEffect(()=>{if(projectId&&planId)void optional<Row|null>("/v1/projects/"+projectId+"/creative-plans/"+planId,null).then(setPlanDetail)},[projectId,planId]);
@@ -79,6 +81,10 @@ export default function App(){
  useEffect(()=>{if(projectId&&audioId)void optional<Row|null>("/v1/projects/"+projectId+"/audio-plans/"+audioId,null).then(setAudioDetail)},[projectId,audioId]);
  async function act(fn:()=>Promise<any>,message:string){setBusy(true);setError("");setNotice("");try{await fn();setNotice(message);await refresh()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
  const call=(path:string,method:string,body?:unknown)=>api(path,req(method,body));
+ async function logout(){try{await api("/v1/auth/logout",req("POST"))}catch{}sessionStorage.removeItem("aivedio-session");setSession("");setProjects([]);setProjectId("")}
+ async function login(event:any){event.preventDefault();setAuthBusy(true);setAuthError("");try{const result=await api<Row>("/v1/auth/login",req("POST",{email,password}));sessionStorage.setItem("aivedio-session",result.token);setSession(result.token);setPassword("")}catch(e){setAuthError(e instanceof Error?e.message:"Login failed")}finally{setAuthBusy(false)}}
+ if(!session)return <main className="studio-shell"><section className="studio-card" style={{maxWidth:480,margin:"8vh auto",padding:28}}><h1>AIVEDIO Studio</h1><p>Sign in to access your productions.</p><form onSubmit={login}><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/></label><button type="submit" disabled={authBusy}>{authBusy?"Signing in…":"Sign in"}</button>{authError&&<p className="feedback feedback-error">{authError}</p>}</form><small>Accounts are provisioned by your AIVEDIO administrator.</small></section></main>;
+
  async function createProject(){await act(async()=>{const p=await call("/v1/projects","POST",{title:projectTitle,mode:"flow",creativeBrief:brief});setProjectId(p.id)},"Project created")}
  async function addScene(){await act(async()=>{const s=await call("/v1/projects/"+projectId+"/scenes","POST",{title:"Scene "+(scenes.length+1),prompt:"Describe the scene…",durationSeconds:10,sceneOrder:scenes.length});setSceneId(s.id)},"Scene added")}
  async function saveScene(){if(!scene)return;await act(()=>call("/v1/scenes/"+scene.id,"PATCH",{prompt}),"Scene saved")}
