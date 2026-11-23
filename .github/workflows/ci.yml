@@ -45,6 +45,8 @@ jobs:
         run: pnpm typecheck
       - name: Core creative-plan duration regression tests
         run: pnpm --filter @aivedio/api exec tsx --test ../../packages/core/tests/creative-director.test.ts
+      - name: Worker orchestration and router tests
+        run: pnpm --filter @aivedio/worker test
       - name: Build
         run: pnpm build
       - name: Apply migrations to disposable CI database
