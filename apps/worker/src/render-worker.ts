@@ -5,14 +5,15 @@ import {createReadStream} from "node:fs";
 import crypto from "node:crypto";
 import {resolveMediaPath,compileRender,runFfmpeg,probeOutput} from "./render-plan.js";
 import type {RenderManifest} from "@aivedio/core";
-const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:false}:undefined});
+const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:true}:undefined});
 const workerId=process.env.RENDER_WORKER_ID??"render-"+process.pid;let stopped=false;
 process.on("SIGINT",()=>stopped=true);process.on("SIGTERM",()=>stopped=true);
 const srtTime=(ms:number)=>{const n=Math.max(0,Math.round(ms));const h=Math.floor(n/3600000),m=Math.floor(n%3600000/60000),s=Math.floor(n%60000/1000),x=n%1000;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")},${String(x).padStart(3,"0")}`};
 function srt(manifest:RenderManifest){return manifest.subtitles.map((c,i)=>`${i+1}\n${srtTime(c.startMs)} --> ${srtTime(c.endMs)}\n${c.text.replace(/\r?\n/g," ")}\n`).join("\n")}
 async function claim(){
  const c=await pool.connect();try{await c.query("BEGIN");
- const r=await c.query("SELECT * FROM render_jobs WHERE (status='queued' AND available_at<=now()) OR (status IN ('validating','rendering','uploading') AND lease_expires_at<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1");
+ await c.query("UPDATE render_jobs SET status='failed',stage='failed',error=COALESCE(error,'Render worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE status IN ('validating','rendering','uploading') AND lease_expires_at<now() AND attempt>=max_attempts");
+ const r=await c.query("SELECT * FROM render_jobs WHERE ((status='queued' AND available_at<=now()) OR (status IN ('validating','rendering','uploading') AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1");
  if(!r.rowCount){await c.query("COMMIT");return null}const j=r.rows[0];
  const u=await c.query("UPDATE render_jobs SET status='validating',attempt=attempt+1,lease_owner=$2,lease_expires_at=now()+interval '20 minutes',stage='validating',error=NULL,updated_at=now() WHERE id=$1 RETURNING *",[j.id,workerId]);await c.query("COMMIT");return u.rows[0];
  }catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}}
@@ -24,8 +25,8 @@ async function run(j:any){
  const manifest=j.manifest as RenderManifest;if(!manifest)throw new Error("Render job has no immutable manifest snapshot");
  const v=(await import("@aivedio/core")).validateRenderManifest(manifest);if(!v.valid)throw new Error(v.errors.join("; "));
  await fs.mkdir(outRoot,{recursive:true});
- const final=path.join(outRoot,j.id+"."+manifest.profile.container),temp=final+".partial";
- const subPath=path.join(outRoot,j.id+".srt");
+ const final=path.join(outRoot,j.id+"-attempt-"+j.attempt+"."+manifest.profile.container),temp=final+".partial";
+ const subPath=path.join(outRoot,j.id+"-attempt-"+j.attempt+".srt");
  const clips=[...manifest.videoClips,...manifest.audioClips];const paths=clips.map(c=>resolveMediaPath(c.storageKey,root));
  for(const p of paths){const real=await fs.realpath(p);const realRoot=await fs.realpath(root);if(!real.startsWith(realRoot+path.sep))throw new Error("Media symlink resolves outside MEDIA_ROOT");await fs.access(real);}
  if(manifest.subtitleMode!=="none"&&manifest.subtitles.length)await fs.writeFile(subPath,srt(manifest),"utf8");
@@ -46,7 +47,8 @@ async function run(j:any){
  await fs.rename(temp,final);
  const checksum=await new Promise<string>((resolve,reject)=>{const hash=crypto.createHash("sha256"),stream=createReadStream(final);stream.on("data",chunk=>hash.update(chunk));stream.on("error",reject);stream.on("end",()=>resolve(hash.digest("hex")))});const stat=await fs.stat(final);
  const sidecar=manifest.subtitleMode==="sidecar"&&manifest.subtitles.length?await fs.stat(subPath):null;
- await pool.query("UPDATE render_jobs SET status='awaiting_review',stage='rendered',progress=1,output_storage_key=$2,output_checksum=$3,output_size_bytes=$4,qa_status=$5,qa_report=$6,review_status='pending',lease_owner=NULL,lease_expires_at=NULL,completed_at=now(),updated_at=now() WHERE id=$1 AND lease_owner=$7",[j.id,path.relative(outRoot,final),checksum,stat.size,qaStatus,{findings,probeSummary:{duration:actualDuration,width:video?.width,height:video?.height,videoCodec:video?.codec_name,audioCodec:audio?.codec_name},sidecar:sidecar?path.relative(outRoot,subPath):null},workerId]);
+ const persisted=await pool.query("UPDATE render_jobs SET status='awaiting_review',stage='rendered',progress=1,output_storage_key=$2,output_checksum=$3,output_size_bytes=$4,qa_status=$5,qa_report=$6,review_status='pending',lease_owner=NULL,lease_expires_at=NULL,completed_at=now(),updated_at=now() WHERE id=$1 AND lease_owner=$7",[j.id,path.relative(outRoot,final),checksum,stat.size,qaStatus,{findings,probeSummary:{duration:actualDuration,width:video?.width,height:video?.height,videoCodec:video?.codec_name,audioCodec:audio?.codec_name},sidecar:sidecar?path.relative(outRoot,subPath):null},workerId]);
+ if(persisted.rowCount!==1)throw new Error("Render worker lease lost during persistence");
  console.log("Render ready for review",j.id,stat.size,qaStatus);
 }
 async function fail(j:any,e:unknown){

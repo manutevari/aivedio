@@ -43,17 +43,24 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
+      - name: Core creative-plan duration regression tests
+        run: pnpm --filter @aivedio/api exec tsx --test ../../packages/core/tests/creative-director.test.ts
       - name: Build
         run: pnpm build
       - name: Apply migrations to disposable CI database
         run: pnpm --filter @aivedio/api test:migrate
+      - name: Agent output validation tests
+        run: pnpm --filter @aivedio/api test:agents
       - name: Authentication security tests
         run: pnpm --filter @aivedio/api test:security
       - name: API production workflow E2E smoke
         run: pnpm --filter @aivedio/api test:e2e
       - name: Python syntax check
         run: |
-          python -m compileall -q apps/streamlit apps/audio-worker apps/qa-worker
-      - name: Check Streamlit requirements
+          python -m compileall -q apps/streamlit apps/asset-worker apps/audio-worker apps/qa-worker
+      - name: Check Python worker requirements
         run: |
           python -m pip install --dry-run -r apps/streamlit/requirements.txt
+          python -m pip install --dry-run -r apps/asset-worker/requirements.txt
+          python -m pip install --dry-run -r apps/audio-worker/requirements.txt
+          python -m pip install --dry-run -r apps/qa-worker/requirements.txt

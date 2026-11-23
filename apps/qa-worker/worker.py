@@ -66,7 +66,8 @@ def rate(v):
 def claim():
  with db() as c:
   with c.cursor() as cur:
-   cur.execute("WITH q AS(SELECT id FROM quality_jobs WHERE status='queued' AND available_at<=now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE quality_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
+   cur.execute("UPDATE quality_jobs SET status='failed',error=COALESCE(error,'Worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE status='processing' AND lease_expires_at<now() AND attempt>=max_attempts")
+   cur.execute("WITH q AS(SELECT id FROM quality_jobs WHERE ((status='queued' AND available_at<=now()) OR (status='processing' AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE quality_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
 def score(fs):return max(0,100-sum({"info":0,"warning":5,"error":18,"critical":40}.get(x["severity"],0) for x in fs))
 def status(fs):return "fail" if any(x["severity"] in ("error","critical") for x in fs) else "warning" if any(x["severity"]=="warning" for x in fs) else "pass"
 def process(j):
@@ -83,15 +84,19 @@ def process(j):
  report={"status":st,"score":sc,"findings":fs,"metrics":profile,"safety":safety,"decision":{"action":action,"reasons":["Safety classifier not configured; human review required"]}}
  with db() as c:
   with c.cursor() as cur:
+   cur.execute("SELECT status,lease_owner FROM quality_jobs WHERE id=%s FOR UPDATE",(j["id"],))
+   lease=cur.fetchone()
+   if not lease or lease["status"]!="processing" or lease["lease_owner"]!=WORKER_ID:raise RuntimeError("Quality worker lease lost")
    cur.execute("INSERT INTO quality_reports(project_id,asset_id,job_id,stage,status,score,action,safety_verdict,report) VALUES(%s,%s,%s,'technical',%s,%s,%s,%s,%s) RETURNING id",(j["project_id"],a["id"],j["id"],st,sc,action,safety["verdict"],json.dumps(report)))
    rid=cur.fetchone()["id"]
    cur.execute("INSERT INTO safety_reviews(project_id,asset_id,report_id,stage,verdict,reason_codes,policy_version) VALUES(%s,%s,%s,%s,%s,%s,%s)",(j["project_id"],a["id"],rid,"asset",safety["verdict"],json.dumps(safety["reasonCodes"]),safety["policyVersion"]))
-   cur.execute("UPDATE quality_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s",(j["id"],))
+   cur.execute("UPDATE quality_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s AND lease_owner=%s",(j["id"],WORKER_ID))
+   if cur.rowcount!=1:raise RuntimeError("Quality worker lease lost during persistence")
 def fail(j,e):
  with db() as c:
   with c.cursor() as cur:
    st="queued" if j["attempt"]<j["max_attempts"] else "failed"
-   cur.execute("UPDATE quality_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '20 seconds',updated_at=now() WHERE id=%s",(st,str(e)[:1000],j["id"]))
+   cur.execute("UPDATE quality_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '20 seconds',updated_at=now() WHERE id=%s AND lease_owner=%s",(st,str(e)[:1000],j["id"],WORKER_ID))
 def main():
  print("AIVEDIO Phase 13 QA worker",WORKER_ID)
  while True:

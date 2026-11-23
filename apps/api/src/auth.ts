@@ -48,3 +48,31 @@ export async function transferProjectOwnership(projectId:string,newOwnerId:strin
   return{projectId,userId:target.id,email:target.email,display_name:target.display_name,role:"owner"};
  }catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}
 }
+
+export async function requestPasswordReset(emailInput:string){
+ const email=emailNorm(String(emailInput??""));if(!email||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return;
+ const emailApi=process.env.RESEND_API_KEY,from=process.env.AIVEDIO_EMAIL_FROM,secret=process.env.AIVEDIO_SESSION_SECRET;if(!emailApi||!from||!secret||secret.length<32||from.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from))return;
+ const user=(await requireDb().query("SELECT id,email FROM users WHERE lower(email)=$1 AND disabled_at IS NULL",[email])).rows[0];
+ const rawBase=(process.env.AIVEDIO_WEB_URL||process.env.AIVEDIO_SITE_URL||"http://localhost:5173").trim();let baseUrl:URL;try{baseUrl=new URL(rawBase)}catch{return}
+ if(!["https:","http:"].includes(baseUrl.protocol)||baseUrl.username||baseUrl.password||baseUrl.pathname!="/"||baseUrl.search||baseUrl.hash||baseUrl.protocol==="http:"&&!/^localhost$|^127\.0\.0\.1$|^\[::1\]$/.test(baseUrl.hostname))return;
+ const token=randomBytes(32).toString("base64url"),digest=createHmac("sha256",secret).update("password-reset:"+token).digest("hex");
+ const expires=new Date(Date.now()+30*60*1000);
+ const link=baseUrl.origin+"/?resetToken="+encodeURIComponent(token);
+ if(!user){await derive("dummy-reset-password","aivedio-reset-dummy-salt",64,{N,r:R,p:P,maxmem:128*1024*1024});return}
+ const persist=await requireDb().connect();try{await persist.query("BEGIN");await persist.query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[user.id]);await persist.query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,$3)",[user.id,digest,expires]);await persist.query("COMMIT")}catch(error){await persist.query("ROLLBACK");throw error}finally{persist.release()}
+ await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+emailApi,"Content-Type":"application/json"},body:JSON.stringify({from,to:[user.email],subject:"Reset your AIVEDIO password",text:"Use this link within 30 minutes to reset your password: "+link+"\nIf you did not request this, ignore this email."}),signal:AbortSignal.timeout(15000)}).catch(()=>{});
+}
+export async function resetPassword(tokenInput:string,passwordInput:string){
+ const token=String(tokenInput??"").trim();if(token.length<20||token.length>200)throw new Error("Invalid or expired reset token");
+ const password=validPassword(passwordInput);const hash=await hashPassword(password);
+ const secret=process.env.AIVEDIO_SESSION_SECRET;if(!secret||secret.length<32)throw new Error("Password reset is not configured");const digest=createHmac("sha256",secret).update("password-reset:"+token).digest("hex");
+ const client=await requireDb().connect();
+ try{await client.query("BEGIN");const row=(await client.query("SELECT user_id FROM password_reset_tokens WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() FOR UPDATE",[digest])).rows[0];if(!row)throw new Error("Invalid or expired reset token");
+ await client.query("UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1",[row.user_id]);
+ await client.query("UPDATE user_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",[row.user_id]);
+ await client.query("INSERT INTO query_history(project_id,query,intent,response_summary) VALUES(NULL,$1,'password_reset',$2)",["Password reset completed for user "+row.user_id,"All active sessions revoked"]);
+ await client.query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[row.user_id]);
+ await client.query("UPDATE password_reset_tokens SET used_at=now() WHERE token_hash=$1",[digest]);
+ await client.query("COMMIT");return true;
+ }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
+}

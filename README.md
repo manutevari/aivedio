@@ -35,4 +35,10 @@ streamlit run app.py
 
 Set `AIVEDIO_API_URL` to the API base URL when the API is running.
 
-**Important:** Provider integrations, persistence, authentication, production safety classifiers and actual media generation are not yet implemented. The safety interface deliberately returns uncertainty when no classifier is connected.
+## Current implementation status
+
+Implemented foundations include PostgreSQL persistence and migrations, API authentication with sessions, project roles, project-scoped authorization, creative plans and screenplay packages, asset-analysis/QA/audio-analysis queues, timeline editing, render-job snapshots, and a local FFmpeg render worker.
+
+**Not production-complete:** no real media-generation provider adapters are registered; generation jobs can therefore remain queued until an adapter is implemented and registered. There is no upload/object-storage or authenticated output-download system. Safety classification is not connected and returns uncertainty; technical QA is limited; advanced transitions, sidechain ducking, audio fades, overlays, browser/Streamlit integration tests, worker integration tests, deployment orchestration, and production release procedures remain incomplete.
+
+The repository is a foundation—not a fully operational universal AI media studio. Do not deploy production or run live migrations until CI is green and the remaining release blockers have been reviewed.

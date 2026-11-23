@@ -2,7 +2,7 @@ import os
 import requests
 import streamlit as st
 
-API=os.getenv("AIVEDIO_API_URL","http://localhost:3000").rstrip("/")
+API=str(st.secrets.get("AIVEDIO_API_URL",os.getenv("AIVEDIO_API_URL","http://localhost:3000"))).rstrip("/")
 st.set_page_config(page_title="AIVEDIO Studio",page_icon="🎬",layout="wide")
 st.markdown("""<style>.stApp{background:#080b14;color:#e7eaf5}[data-testid=stSidebar]{background:#0b0f1a}div[data-testid=stMetric]{background:#111827;border:1px solid #273149;padding:12px;border-radius:12px}</style>""",unsafe_allow_html=True)
 
@@ -32,19 +32,60 @@ if "aivedio_session" not in st.session_state:
     st.session_state.aivedio_session=""
 
 if not st.session_state.aivedio_session:
-    st.title("AIVEDIO · Sign in")
-    with st.form("login_form"):
-        login_email=st.text_input("Email")
-        login_password=st.text_input("Password",type="password")
-        submit_login=st.form_submit_button("Sign in")
-    if submit_login:
-        try:
-            session=api("/v1/auth/login","POST",{"email":login_email,"password":login_password})
-            st.session_state.aivedio_session=session["token"]
-            st.rerun()
-        except Exception:
-            st.error("Sign-in failed. Check your credentials or contact the administrator.")
-    st.caption("Accounts are provisioned by your AIVEDIO administrator.")
+    st.title("AIVEDIO · Account")
+    auth_tab=st.tabs(["Sign in","Create account","Forgot password","Reset password"])
+    with auth_tab[0]:
+        with st.form("login_form"):
+            login_email=st.text_input("Email",key="auth_login_email")
+            login_password=st.text_input("Password",type="password",key="auth_login_password")
+            submit_login=st.form_submit_button("Sign in")
+        if submit_login:
+            try:
+                session=api("/v1/auth/login","POST",{"email":login_email,"password":login_password})
+                st.session_state.aivedio_session=session["token"]
+                st.rerun()
+            except requests.HTTPError as exc:
+                status=exc.response.status_code if exc.response is not None else None
+                if status==401:
+                    st.error("Sign-in failed: the account/email or password is incorrect, or the account is disabled.")
+                elif status==429:
+                    st.error("Too many sign-in attempts. Please wait and try again.")
+                elif status and status>=500:
+                    st.error("The AIVEDIO API is having a server error. Check API health and deployment logs.")
+                else:
+                    st.error(f"Sign-in request failed (HTTP {status or 'unknown'}). Check API URL and deployment.")
+            except requests.RequestException:
+                st.error("Cannot reach the AIVEDIO API. Check AIVEDIO_API_URL and API availability.")
+    with auth_tab[1]:
+        with st.form("register_form"):
+            register_email=st.text_input("Email")
+            register_password=st.text_input("Password (12+ characters)",type="password")
+            register_name=st.text_input("Display name")
+            submit_register=st.form_submit_button("Create account")
+        if submit_register:
+            try:
+                session=api("/v1/auth/register","POST",{"email":register_email,"password":register_password,"displayName":register_name})
+                st.session_state.aivedio_session=session["token"]
+                st.rerun()
+            except Exception as exc: st.error(str(exc))
+    with auth_tab[2]:
+        with st.form("forgot_form"):
+            forgot_email=st.text_input("Account email")
+            submit_forgot=st.form_submit_button("Send reset link")
+        if submit_forgot:
+            try: api("/v1/auth/forgot-password","POST",{"email":forgot_email})
+            except Exception: pass
+            st.info("If an account exists, reset instructions have been sent.")
+    with auth_tab[3]:
+        with st.form("reset_form"):
+            reset_token=st.text_input("Reset token")
+            new_password=st.text_input("New password (12+ characters)",type="password")
+            submit_reset=st.form_submit_button("Reset password")
+        if submit_reset:
+            try:
+                api("/v1/auth/reset-password","POST",{"token":reset_token,"password":new_password})
+                st.success("Password reset. Sign in again.")
+            except Exception as exc: st.error(str(exc))
     st.stop()
 
 if "project" not in st.session_state:
@@ -64,7 +105,7 @@ with st.sidebar:
         st.success(api("/health").get("status","connected"))
     except Exception:
         st.error("API offline · persistence disabled")
-    page=st.radio("Workspace",["Overview","Team","Creative Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs"])
+    page=st.radio("Workspace",["Overview","Team","Creative Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs","Agent Pipeline"])
     st.divider()
     new_title=st.text_input("New production title")
     new_brief=st.text_area("Creative brief",height=100)
@@ -297,6 +338,41 @@ else:
                         action(lambda:api(f"/v1/render-jobs/{render['id']}/review","POST",{"decision":"approve","reviewer":reviewer,"notes":"Reviewed in Streamlit"}),"Render approved")
                     if c2.button("Reject render",key="reject-render-"+render["id"]):
                         action(lambda:api(f"/v1/render-jobs/{render['id']}/review","POST",{"decision":"reject","reviewer":reviewer,"notes":"Reviewed in Streamlit"}),"Render rejected")
+
+    elif page=="Agent Pipeline":
+        st.subheader("Improvisor · Implementation · Auditor · Patcher")
+        st.info("Human-in-the-loop: proposals are not applied unless you approve the run and then explicitly apply the patch.")
+        with st.form("agent_pipeline"):
+            agent_brief=st.text_area("Brief override (optional)",value=st.session_state.project.get("creative_brief") or "")
+            agent_outcome=st.text_area("Desired outcome",value="Improve creative direction, continuity, production readiness and quality.")
+            start_agent=st.form_submit_button("Run agents")
+        if start_agent:
+            action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs","POST",{"brief":agent_brief,"requestedOutcome":agent_outcome}),"Agent proposal created")
+            st.rerun()
+        agent_runs=safe(f"/v1/projects/{project_id}/agent-pipeline/runs",[])
+        for run in agent_runs:
+            with st.expander(f"{run.get('status')} · {run.get('created_at')}"):
+                detail=safe(f"/v1/projects/{project_id}/agent-pipeline/runs/{run['id']}",run)
+                st.metric("Audit score",detail.get("audit",{}).get("score","—"))
+                st.write("Verdict",detail.get("audit",{}).get("verdict"))
+                st.json(detail.get("improvisor",{}))
+                st.subheader("Implementation plan")
+                st.json(detail.get("implementation_plan",{}))
+                st.subheader("Auditor findings")
+                st.json(detail.get("audit",{}))
+                st.subheader("Patch proposal")
+                st.json(detail.get("patch",{}))
+                if detail.get("status")=="awaiting_approval":
+                    c1,c2=st.columns(2)
+                    if c1.button("Reject proposal",key="agent-reject-"+detail["id"]):
+                        action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs/{detail['id']}/decision","POST",{"decision":"reject","notes":"Rejected in Streamlit HITL"}),"Run rejected")
+                        st.rerun()
+                    if c2.button("Approve proposal",key="agent-approve-"+detail["id"]):
+                        action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs/{detail['id']}/decision","POST",{"decision":"approve","notes":"Approved in Streamlit HITL"}),"Run approved")
+                        st.rerun()
+                if detail.get("status")=="approved" and st.button("Apply approved patch",key="agent-apply-"+detail["id"]):
+                    action(lambda:api(f"/v1/projects/{project_id}/agent-pipeline/runs/{detail['id']}/apply","POST",{}),"Patch applied")
+                    st.rerun()
 
     elif page=="Generation Jobs":
         st.subheader("Generation queue")

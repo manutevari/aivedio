@@ -51,7 +51,8 @@ def analyze(path):
 def claim():
  with db() as c:
   with c.cursor() as cur:
-   cur.execute("WITH q AS(SELECT id FROM audio_analysis_jobs WHERE status='queued' AND available_at<=now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE audio_analysis_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
+   cur.execute("UPDATE audio_analysis_jobs SET status='failed',error=COALESCE(error,'Worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE status='processing' AND lease_expires_at<now() AND attempt>=max_attempts")
+   cur.execute("WITH q AS(SELECT id FROM audio_analysis_jobs WHERE ((status='queued' AND available_at<=now()) OR (status='processing' AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE audio_analysis_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
 def findings(metrics,thresholds):
  out=[]
  def add(code,severity,msg,metadata=None):out.append({"code":code,"severity":severity,"message":msg,"confidence":1.0,"metadata":metadata or {}})
@@ -73,13 +74,17 @@ def process(job):
  status="fail" if any(f["severity"]=="error" for f in fs) else "warning" if fs else "pass"
  with db() as c:
   with c.cursor() as cur:
+   cur.execute("SELECT status,lease_owner FROM audio_analysis_jobs WHERE id=%s FOR UPDATE",(job["id"],))
+   lease=cur.fetchone()
+   if not lease or lease["status"]!="processing" or lease["lease_owner"]!=WORKER_ID:raise RuntimeError("Audio-analysis worker lease lost")
    cur.execute("INSERT INTO audio_analysis_reports(project_id,asset_id,job_id,status,score,metrics,findings,thresholds) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",(job["project_id"],asset["id"],job["id"],status,score,json.dumps(metrics),json.dumps(fs),json.dumps(job["thresholds"] or {})))
-   cur.execute("UPDATE audio_analysis_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s",(job["id"],))
+   cur.execute("UPDATE audio_analysis_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s AND lease_owner=%s",(job["id"],WORKER_ID))
+   if cur.rowcount!=1:raise RuntimeError("Audio-analysis lease lost during persistence")
 def fail(j,e):
  with db() as c:
   with c.cursor() as cur:
    status="queued" if j["attempt"]<j["max_attempts"] else "failed"
-   cur.execute("UPDATE audio_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '20 seconds',updated_at=now() WHERE id=%s",(status,str(e)[:1000],j["id"]))
+   cur.execute("UPDATE audio_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '20 seconds',updated_at=now() WHERE id=%s AND lease_owner=%s",(status,str(e)[:1000],j["id"],WORKER_ID))
 def main():
  print("AIVEDIO Audio QA worker",WORKER_ID)
  while True:

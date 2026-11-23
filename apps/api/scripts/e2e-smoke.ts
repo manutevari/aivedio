@@ -69,6 +69,14 @@ try{
  assert.equal(unauth.status,401,"API must reject unauthenticated requests");
  const badLogin=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"wrong-password"})});
  assert.equal(badLogin.status,401,"Invalid credentials must be rejected");
+ const forgotExisting=await fetch(baseUrl+"/v1/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test"})});
+ const forgotUnknown=await fetch(baseUrl+"/v1/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"unknown@ci.aivedio.test"})});
+ assert.equal(forgotExisting.status,200,"Password recovery should respond generically");
+ assert.equal(forgotUnknown.status,200,"Unknown-account recovery should not disclose account existence");
+ assert.deepEqual(await forgotExisting.json(),await forgotUnknown.json(),"Password recovery response must be generic");
+ const badReset=await fetch(baseUrl+"/v1/auth/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:"invalid-reset-token",password:"New-CI-Password-123!"})});
+ assert.equal(badReset.status,400,"Invalid reset tokens must not reset passwords");
+
  for(let attempt=0;attempt<6;attempt++){
   const response=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
   assert.equal(response.status,401,"Invalid login attempt must be rejected");
@@ -131,28 +139,64 @@ try{
  assert.ok(memoryRows.results.some((m:any)=>m.content.includes("project scoped")));
  assert.equal(memoryRows.results.some((m:any)=>m.content.includes("private global")),false,"Project memory search must not leak global memory rows");
  const reviewerMembers=await fetch(baseUrl+`/v1/projects/${project.id}/members`,{headers:{Authorization:"Bearer "+second.token}});assert.equal(reviewerMembers.status,403,"Reviewer cannot manage project members");
+
+ const editorPassword="CI-"+"Editor-"+"Password-123!";
+ const editorSession=await request("POST","/v1/auth/register",{email:"editor@ci.aivedio.test",password:editorPassword,displayName:"CI Editor"},201);
+ const editorToken=editorSession.token;
+ await request("POST",`/v1/projects/${project.id}/members`,{email:"editor@ci.aivedio.test",role:"editor"},201);
  const isolatedProject=await request("POST","/v1/projects",{title:"CI isolated resource fixture",mode:"flow",creativeBrief:"Ownership boundary regression fixture"},201);
+ const lockedTrack=await request("POST",`/v1/projects/${isolatedProject.id}/timeline/tracks`,{name:"Locked track regression",kind:"video"},201);
+ const lockJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status) VALUES($1,'video','aivedio-ci-fixture','locked-track fixture','completed','approved','pass') RETURNING id",[isolatedProject.id]);
+ const lockAsset=await db.query("INSERT INTO media_assets(project_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata) VALUES($1,$2,'video','ready','ci-fixture','locked/asset.mp4','video/mp4',1,'{}'::jsonb) RETURNING id",[isolatedProject.id,lockJob.rows[0].id]);
+ const lockClipResponse=await fetch(baseUrl+`/v1/timeline/tracks/${lockedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({title:"Lock regression clip",kind:"video",assetId:lockAsset.rows[0].id,timelineDurationMs:2000,sourceDurationMs:2000})});
+ assert.equal(lockClipResponse.status,201,"Admin can create a clip on an unlocked track");
+ const lockClip=await lockClipResponse.json();
+ const lockedTrackResponse=await fetch(baseUrl+`/v1/timeline/tracks/${lockedTrack.id}`,{method:"PATCH",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({locked:true})});
+ assert.equal(lockedTrackResponse.status,200,"Track lock should persist");
+ const lockedCreate=await fetch(baseUrl+`/v1/timeline/tracks/${lockedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({title:"Locked create",kind:"video",assetId:lockAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
+ assert.equal(lockedCreate.status,400,"Locked tracks must reject clip creation");
+ const lockedUpdate=await fetch(baseUrl+`/v1/timeline/clips/${lockClip.id}`,{method:"PATCH",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({title:"Locked edit"})});
+ assert.equal(lockedUpdate.status,400,"Locked tracks must reject clip updates");
+ const lockedSplit=await fetch(baseUrl+`/v1/timeline/clips/${lockClip.id}/split`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({offsetMs:500})});
+ assert.equal(lockedSplit.status,400,"Locked tracks must reject clip splits");
+ const lockedTrim=await fetch(baseUrl+`/v1/timeline/clips/${lockClip.id}/trim`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({startMs:100,endMs:100})});
+ assert.equal(lockedTrim.status,400,"Locked tracks must reject clip trims");
+ const lockedDelete=await fetch(baseUrl+`/v1/timeline/clips/${lockClip.id}`,{method:"DELETE",headers:{Authorization:"Bearer "+token}});
+ assert.equal(lockedDelete.status,400,"Locked tracks must reject clip deletion");
+ await fetch(baseUrl+`/v1/timeline/tracks/${lockedTrack.id}`,{method:"PATCH",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({locked:false})});
  const isolatedJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status) VALUES($1,'video','aivedio-ci-fixture','ownership boundary fixture','completed','approved','pass') RETURNING id",[isolatedProject.id]);
  const isolatedAsset=await db.query("INSERT INTO media_assets(project_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata) VALUES($1,$2,'video','ready','ci-fixture','isolated/asset.mp4','video/mp4',1,'{}'::jsonb) RETURNING id",[isolatedProject.id,isolatedJob.rows[0].id]);
  const crossProjectAssetReview=await fetch(baseUrl+"/v1/assets/"+isolatedAsset.rows[0].id+"/review",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",reviewer:"spoofed"})});
  assert.equal(crossProjectAssetReview.status,404,"Direct asset ID must not bypass project ownership");
  const nestedCrossProjectAnalysis=await fetch(baseUrl+"/v1/projects/"+project.id+"/assets/"+isolatedAsset.rows[0].id+"/analyze",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({kinds:["metadata"]})});
  assert.equal(nestedCrossProjectAnalysis.status,400,"Project-scoped asset operation must reject a foreign asset ID");
- // Phase 22 cross-project resource-ownership regressions.
- await request("POST",`/v1/projects/${project.id}/members`,{email:"reviewer@ci.aivedio.test",role:"editor"},201);
- const ownedTrack=await request("POST",`/v1/projects/${project.id}/timeline/tracks`,{name:"Ownership test track",kind:"video"},201);
+ // Phase 22 cross-project resource-ownership regressions. Use an editor token:
+ // reviewers are intentionally read-only except for review/approval actions.
+ const ownedTrackResponse=await fetch(baseUrl+`/v1/projects/${project.id}/timeline/tracks`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({name:"Ownership test track",kind:"video"})});
+ assert.equal(ownedTrackResponse.status,201,"Editor may create a timeline track");
+ const ownedTrack=await ownedTrackResponse.json();
  const foreignTrack=await db.query("INSERT INTO timeline_tracks(project_id,name,kind) VALUES($1,'Foreign audio track','audio') RETURNING id",[isolatedProject.id]);
  const foreignSubtitle=await db.query("INSERT INTO subtitle_cues(project_id,start_ms,end_ms,text) VALUES($1,0,1000,'foreign subtitle marker') RETURNING id",[isolatedProject.id]);
- const subtitleCollision=await fetch(baseUrl+`/v1/projects/${project.id}/subtitles`,{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({id:foreignSubtitle.rows[0].id,startMs:0,endMs:1000,text:"attempted overwrite"})});
+ const subtitleCollision=await fetch(baseUrl+`/v1/projects/${project.id}/subtitles`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({id:foreignSubtitle.rows[0].id,startMs:0,endMs:1000,text:"attempted overwrite"})});
  assert.equal(subtitleCollision.status,400,"Subtitle upsert must reject IDs owned by another project");
  const subtitleAfter=await db.query("SELECT project_id,text FROM subtitle_cues WHERE id=$1",[foreignSubtitle.rows[0].id]);
  assert.equal(subtitleAfter.rows[0].project_id,isolatedProject.id,"Cross-project subtitle collision must preserve ownership");assert.equal(subtitleAfter.rows[0].text,"foreign subtitle marker","Cross-project subtitle collision must not overwrite content");
- const foreignAssetClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign asset attempt",kind:"video",assetId:isolatedAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
+ const foreignAssetClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign asset attempt",kind:"video",assetId:isolatedAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
  assert.equal(foreignAssetClip.status,400,"Timeline clip creation must reject assets owned by another project");
  const foreignScene=await db.query("INSERT INTO scenes(project_id,scene_order,title,prompt) VALUES($1,999,'Foreign scene fixture','') RETURNING id",[isolatedProject.id]);
- const foreignSceneClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign scene attempt",kind:"video",sceneId:foreignScene.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
+ const unsafeJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status) VALUES($1,'video','aivedio-ci-fixture','render release gate','completed','approved','pass') RETURNING id",[isolatedProject.id]);
+ const unsafeAsset=await db.query("INSERT INTO media_assets(project_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata) VALUES($1,$2,'video','ready','ci-fixture','unsafe/render.mp4','video/mp4',1,'{}'::jsonb) RETURNING id",[isolatedProject.id,unsafeJob.rows[0].id]);
+ await db.query("INSERT INTO quality_reports(project_id,asset_id,stage,status,score,action,safety_verdict,report) VALUES($1,$2,'asset','fail',0,'block','uncertain',$3::jsonb)",[isolatedProject.id,unsafeAsset.rows[0].id,JSON.stringify({fixture:true,findings:[{code:"CI_FAIL"}]})]);
+ const unsafeTrack=await request("POST",`/v1/projects/${isolatedProject.id}/timeline/tracks`,{name:"Unsafe render test",kind:"video"},201);
+ const unsafeClip=await request("POST",`/v1/timeline/tracks/${unsafeTrack.id}/clips`,{title:"Unsafe fixture",kind:"video",assetId:unsafeAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000},201);
+ const unsafeRender=await fetch(baseUrl+`/v1/projects/${isolatedProject.id}/render-jobs`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({options:{subtitleMode:"none"}})});
+ assert.equal(unsafeRender.status,400,"Render creation must reject assets with failed QA or uncleared safety review");
+ await db.query("UPDATE media_assets SET status='quarantined' WHERE id=$1",[unsafeAsset.rows[0].id]);
+ const unsafeAssetApproval=await fetch(baseUrl+"/v1/assets/"+unsafeAsset.rows[0].id+"/review",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",reviewer:"CI"})});
+ assert.equal(unsafeAssetApproval.status,400,"Asset release must reject failed technical QA and uncleared safety review");
+ const foreignSceneClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign scene attempt",kind:"video",sceneId:foreignScene.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
  assert.equal(foreignSceneClip.status,400,"Timeline clip creation must reject scenes owned by another project");
- const foreignMix=await fetch(baseUrl+`/v1/projects/${project.id}/audio-mix`,{method:"PUT",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({trackId:foreignTrack.rows[0].id,gainDb:0,muted:false})});
+ const foreignMix=await fetch(baseUrl+`/v1/projects/${project.id}/audio-mix`,{method:"PUT",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({trackId:foreignTrack.rows[0].id,gainDb:0,muted:false})});
  assert.equal(foreignMix.status,400,"Audio mix settings must reject tracks owned by another project");
 
  const reviewerEdit=await fetch(baseUrl+`/v1/projects/${project.id}`,{method:"PATCH",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Unauthorized change"})});
@@ -199,6 +243,13 @@ try{
    ON CONFLICT(provider_id) DO NOTHING`,
   [JSON.stringify({fixture:true,description:"CI-only synthetic media rows; no external provider call."})]
  );
+ await db.query("UPDATE media_providers SET descriptor=$2::jsonb WHERE provider_id=$1",["aivedio-ci-fixture",JSON.stringify({id:"aivedio-ci-fixture",name:"AIVEDIO CI Fixture",source:"manual",capabilities:[{task:"video",inputs:["prompt"],outputs:["video"],maxDurationSeconds:120,aspectRatios:["16:9"],resolutions:["720p","1080p"],supportsReferences:true,supportsAudio:false}],authRequired:false,authConfigured:false,pricing:{free:true,verifiedAt:new Date().toISOString()},trust:{verified:true,score:100,notes:["Synthetic CI-only provider"]},availability:"available"})]);
+ const validGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,task:"video",prompt:"CI generation ownership test",freeOnly:false})});
+ assert.equal(validGeneration.status,201,"Valid project generation job should be created with the test provider");
+ const foreignSceneGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,sceneId:foreignScene.rows[0].id,task:"video",prompt:"Foreign scene attempt",freeOnly:false})});
+ assert.equal(foreignSceneGeneration.status,400,"Generation jobs must reject scenes from another project");
+ const foreignAssetGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,inputAssets:[isolatedAsset.rows[0].id],task:"video",prompt:"Foreign asset attempt",freeOnly:false})});
+ assert.equal(foreignAssetGeneration.status,400,"Generation jobs must reject input assets from another project");
  const assetAssignments:Record<string,string>={};
  const shots=plan.scenes.flatMap((scene:any)=>scene.shots.map((shot:any)=>({scene,shot})));
  for(const {scene,shot} of shots){
