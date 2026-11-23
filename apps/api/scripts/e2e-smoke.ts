@@ -62,18 +62,19 @@ try{
  assert.equal(logout.status,204);
  const revoked=await fetch(baseUrl+"/v1/auth/me",{headers:{Authorization:"Bearer "+loginSession.token}});
  assert.equal(revoked.status,401,"Revoked sessions must stop authenticating");
- for(let attempt=0;attempt<7;attempt++){
-  const response=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
-  assert.equal(response.status,401,"Invalid login attempt must be rejected");
- }
- const limited=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
- assert.equal(limited.status,429,"Authentication abuse rate limit must activate");
+
  await request("GET","/health",undefined,200);
  await request("GET","/ready",undefined,200);
  const unauth=await fetch(baseUrl+"/v1/projects");
  assert.equal(unauth.status,401,"API must reject unauthenticated requests");
  const badLogin=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"wrong-password"})});
  assert.equal(badLogin.status,401,"Invalid credentials must be rejected");
+ for(let attempt=0;attempt<7;attempt++){
+  const response=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
+  assert.equal(response.status,401,"Invalid login attempt must be rejected");
+ }
+ const limited=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
+ assert.equal(limited.status,429,"Authentication abuse rate limit must activate");
 
  const project=await request("POST","/v1/projects",{
   title:"AIVEDIO CI workflow fixture",
