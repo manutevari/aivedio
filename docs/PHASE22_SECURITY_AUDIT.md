@@ -20,3 +20,14 @@
 - Full route/resource authorization matrix and ownership audit remains required.
 - Add CSP and review deployment-specific security headers for the Studio hosting origin.
 - Production deployment, migrations and secret rotation are not performed in this phase.
+
+## Audit update — endpoint authorization findings
+- [x] Resolve direct resource ownership for assets, generation jobs, render jobs, scenes, subtitle cues, timeline tracks/clips, and workflow runs before applying project role checks.
+- [x] Reject requests when an explicitly supplied project scope does not match the resource's actual project.
+- [x] Conceal missing or cross-project direct resources with 404.
+- [x] Provider endpoints are admin-only, including provider routing.
+- [x] Workflow transition and checkpoint mutation endpoints are restricted to admin/trusted-worker authority (current implementation uses admin as the trusted boundary).
+- [x] E2E regression tests for provider-route authorization and workflow transition/checkpoint denial to project reviewers.
+- [ ] Introduce a dedicated worker service credential/role instead of using admin as the worker boundary.
+- [ ] Continue audit of nested project-scoped child IDs and confirm all service-level SQL validates project ownership.
+- [ ] Test direct resource cross-project attempts for each mapped resource type.
