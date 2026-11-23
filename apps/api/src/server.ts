@@ -44,7 +44,7 @@ app.addHook("onRequest",async(request,reply)=>{
  (request as any).user=user;
  const parts=pathname.split("/").filter(Boolean);
  let projectId=parts[0]==="v1"&&parts[1]==="projects"?parts[2]:undefined;
- const queryProject=(request.query as any)?.projectId;if(!projectId&&queryProject)projectId=String(queryProject);
+ const queryProject=(request.query as any)?.projectId;const bodyProject=(request.body as any)?.projectId;if(!projectId&&queryProject)projectId=String(queryProject);if(!projectId&&bodyProject)projectId=String(bodyProject);
  if(!projectId){
   const tableByType:Record<string,string>={assets:"media_assets","generation-jobs":"generation_jobs","render-jobs":"render_jobs",scenes:"scenes",subtitles:"subtitles"};
   const kind=parts[1],id=parts[2]??parts[1],table=tableByType[kind];
@@ -112,9 +112,9 @@ app.post("/v1/providers/route",async(request)=>routeRequest(request.body as any)
 app.post("/v1/providers/discovery-candidates",async(request)=>{const p=discoveryCandidate(request.body as any);registerDiscoveredProvider(p);return p});
 app.get("/v1/providers/discovered",async()=>getDiscoveredProviders());
 app.post("/v1/generation-jobs",async(request,reply)=>{const body=request.body as any;const route=await routeRequest({task:body.task,freeOnly:body.freeOnly??false,durationSeconds:body.durationSeconds,aspectRatio:body.aspectRatio,resolution:body.resolution,references:!!body.inputAssets?.length,audio:body.audio,format:body.format});if(!route.provider)return reply.status(422).send({error:route.blockedReason,route});const job=await createGenerationJob({...body,providerId:route.provider.id});return reply.status(201).send({job,route,approvalRequired:true})});
-app.get("/v1/generation-jobs",async(request)=>{const q=request.query as {projectId?:string};return listGenerationJobs(q.projectId)});
+app.get("/v1/generation-jobs",async(request)=>{const q=request.query as {projectId?:string};return listGenerationJobs(q.projectId,(request as any).user as AuthUser)});
 app.post("/v1/generation-jobs/:id/review",async(request,reply)=>{try{return await reviewGenerationJob((request.params as {id:string}).id,parseReview(request.body))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
-app.get("/v1/assets",async(request)=>{const q=request.query as {projectId?:string};return q.projectId?listProjectAssets(q.projectId):listProjectAssetsGlobal()});
+app.get("/v1/assets",async(request)=>{const q=request.query as {projectId?:string};return q.projectId?listProjectAssets(q.projectId):listProjectAssetsGlobal((request as any).user as AuthUser)});
 app.post("/v1/assets/:id/review",async(request,reply)=>{try{return await reviewAsset((request.params as {id:string}).id,parseReview(request.body))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/generation-jobs/:id",async(request)=>getGenerationJob((request.params as {id:string}).id));
 app.post("/v1/generation-jobs/:id/transition",async(request,reply)=>{try{return await transitionGenerationJob((request.params as {id:string}).id,(request.body as any).status,(request.body as any).result,(request.body as any).error)}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
