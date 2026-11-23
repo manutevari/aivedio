@@ -58,7 +58,7 @@ export async function requestPasswordReset(emailInput:string){
  const token=randomBytes(32).toString("base64url"),digest=createHmac("sha256",secret).update("password-reset:"+token).digest("hex");
  const expires=new Date(Date.now()+30*60*1000);
  const link=baseUrl.origin+"/?resetToken="+encodeURIComponent(token);
- if(!user)return;
+ if(!user){await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+emailApi,"Content-Type":"application/json"},body:JSON.stringify({from,to:["reset-request@invalid.example"],subject:"Reset your AIVEDIO password",text:"If you requested a password reset, follow the instructions in your email."}),signal:AbortSignal.timeout(15000)}).catch(()=>{});return}
  const persist=await requireDb().connect();try{await persist.query("BEGIN");await persist.query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[user.id]);await persist.query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,$3)",[user.id,digest,expires]);await persist.query("COMMIT")}catch(error){await persist.query("ROLLBACK");throw error}finally{persist.release()}
  await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+emailApi,"Content-Type":"application/json"},body:JSON.stringify({from,to:[user.email],subject:"Reset your AIVEDIO password",text:"Use this link within 30 minutes to reset your password: "+link+"\nIf you did not request this, ignore this email."}),signal:AbortSignal.timeout(15000)}).catch(()=>{});
 }
