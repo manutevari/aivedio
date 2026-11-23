@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from app import main
 
 client = TestClient(main.app)
+RealAsyncClient = httpx.AsyncClient
 
 
 def test_health_is_local():
@@ -38,7 +39,7 @@ async def test_proxy_preserves_method_path_query_headers_body(monkeypatch):
         captured["body"] = request.content
         return httpx.Response(201, json={"created": True}, headers={"x-upstream-test": "yes"})
 
-    monkeypatch.setattr(main.httpx, "AsyncClient", lambda **kwargs: httpx.AsyncClient(transport=httpx.MockTransport(handler), **kwargs))
+    monkeypatch.setattr(main.httpx, "AsyncClient", lambda **kwargs: RealAsyncClient(transport=httpx.MockTransport(handler), **kwargs)
     response = client.post("/v1/projects?sort=recent", headers={"Authorization": "Bearer test-token"}, json={"title": "Demo"})
     assert response.status_code == 201
     assert response.json() == {"created": True}
