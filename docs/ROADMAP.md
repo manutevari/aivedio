@@ -232,7 +232,7 @@
 - [x] Require project scope for non-admin memory search
 - [x] Project-scoped memory search excludes global memory rows
 - [x] Unbound/global workflow event/checkpoint access restricted to admin
-- [x] E2E negative tests for provider/cache/global memory and memory isolation
+- [x] E2E negative tests for provider/cache/global memory and memory isolation (CI green on commit 9399d6c)
 - [ ] Complete route/resource authorization matrix
 - [ ] Query-history and cache write ownership policy
 - [ ] Full nested-resource authorization tests
