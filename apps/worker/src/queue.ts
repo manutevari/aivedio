@@ -1,6 +1,7 @@
 import pg from "pg";
 import {WorkerJob,validateGeneratedAsset,assessGenerationResult} from "@aivedio/core";
-import {getAdapter,registeredAdapterIds} from "./adapters.js";\nimport {assertRoute} from "./router.js";
+import {getAdapter,registeredAdapterIds} from "./adapters.js";
+import {assertRoute} from "./router.js";
 const {Pool}=pg;
 export const pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:true}:undefined});
 const WORKER_ID=process.env.WORKER_ID??"aivedio-worker-"+process.pid;
