@@ -51,7 +51,8 @@ def analyze(path):
 def claim():
  with db() as c:
   with c.cursor() as cur:
-   cur.execute("WITH q AS(SELECT id FROM audio_analysis_jobs WHERE status='queued' AND available_at<=now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE audio_analysis_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
+   cur.execute("UPDATE audio_analysis_jobs SET status='failed',error=COALESCE(error,'Worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE status='processing' AND lease_expires_at<now() AND attempt>=max_attempts")
+   cur.execute("WITH q AS(SELECT id FROM audio_analysis_jobs WHERE ((status='queued' AND available_at<=now()) OR (status='processing' AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE audio_analysis_jobs j SET status='processing',attempt=attempt+1,lease_owner=%s,lease_expires_at=now()+interval '10 minutes',updated_at=now() FROM q WHERE j.id=q.id RETURNING j.*",(WORKER_ID,));return cur.fetchone()
 def findings(metrics,thresholds):
  out=[]
  def add(code,severity,msg,metadata=None):out.append({"code":code,"severity":severity,"message":msg,"confidence":1.0,"metadata":metadata or {}})
