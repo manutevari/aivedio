@@ -43,7 +43,8 @@ async function generateWithFreeModel(payload:unknown,preferredModelId?:string){
  return{modelId:model.id,freeVerifiedAt:model.pricing.verifiedAt??new Date().toISOString(),output:extractJson(result?.choices?.[0]?.message)};
 }
 export async function enrichCreativePlan(projectId:string,planId:string,input:{requiresResearch?:boolean;researchQuery?:string;modelId?:string}={}){
- const db=requireDb();const result=await db.query("SELECT plan,input,version FROM creative_plans WHERE project_id=$1 AND id=$2",[projectId,planId]);if(!result.rowCount)throw new Error("Creative plan not found");
+ const db=requireDb();const result=await db.query("SELECT plan,input,version,status FROM creative_plans WHERE project_id=$1 AND id=$2",[projectId,planId]);if(!result.rowCount)throw new Error("Creative plan not found");
+ if(result.rows[0].status!=="approved")throw new Error("Creative plan must be approved before screenplay generation");
  const plan=result.rows[0].plan as CreativePlan;const projectInput=result.rows[0].input as Record<string,unknown>;
  const [refs,characters]=await Promise.all([
   db.query("SELECT id,kind,uri,label,tags,metadata FROM flow_references WHERE project_id=$1 ORDER BY created_at DESC LIMIT 40",[projectId]),
@@ -59,13 +60,19 @@ export async function enrichCreativePlan(projectId:string,planId:string,input:{r
  const validation=validateCreativeScript(plan,content,sources);
  const unknownRefs=content.shots.flatMap(s=>s.referenceIds).filter(id=>!references.some(r=>r.id===id));
  if(unknownRefs.length){validation.errors.push("Shot prompts refer to unknown project references: "+[...new Set(unknownRefs)].join(", "));validation.valid=false}
- const version=Number((await db.query("SELECT COALESCE(MAX(version),0)+1 v FROM creative_script_packages WHERE project_id=$1 AND plan_id=$2",[projectId,planId])).rows[0].v);
  const researchData={required:needsResearch,query:needsResearch?query:undefined,sources};
  const confidence={...validation.confidence,requiresHumanReview:true,modelSelfAssessmentNotUsed:true};
- const saved=await db.query("INSERT INTO creative_script_packages(project_id,plan_id,version,status,model_id,pricing_free_verified,content,research,confidence,validation) VALUES($1,$2,$3,'awaiting_review',$4,true,$5,$6,$7,$8) RETURNING *",[projectId,planId,version,generated.modelId,content,researchData,confidence,validation]);
- await db.query("INSERT INTO project_memory(project_id,kind,content,tags,importance) VALUES($1,'script_package',$2,$3,0.65)",[projectId,"Generated screenplay package v"+version+" from creative plan "+planId,["script","creative-package"]]);
- await db.query("INSERT INTO query_history(project_id,query,intent,response_summary) VALUES($1,$2,'scriptwriting',$3)",[projectId,plan.logline,"Created screenplay package v"+version+" using verified free model "+generated.modelId]);
- return saved.rows[0];
+ const client=await db.connect();
+ try{
+  await client.query("BEGIN");
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[projectId+"\\0"+planId]);
+  const version=Number((await client.query("SELECT COALESCE(MAX(version),0)+1 v FROM creative_script_packages WHERE project_id=$1 AND plan_id=$2",[projectId,planId])).rows[0].v);
+  const saved=await client.query("INSERT INTO creative_script_packages(project_id,plan_id,version,status,model_id,pricing_free_verified,content,research,confidence,validation) VALUES($1,$2,$3,'awaiting_review',$4,true,$5,$6,$7,$8) RETURNING *",[projectId,planId,version,generated.modelId,content,researchData,confidence,validation]);
+  await client.query("INSERT INTO project_memory(project_id,kind,content,tags,importance) VALUES($1,'script_package',$2,$3,0.65)",[projectId,"Generated screenplay package v"+version+" from creative plan "+planId,["script","creative-package"]]);
+  await client.query("INSERT INTO query_history(project_id,query,intent,response_summary) VALUES($1,$2,'scriptwriting',$3)",[projectId,plan.logline,"Created screenplay package v"+version+" using verified free model "+generated.modelId]);
+  await client.query("COMMIT");
+  return saved.rows[0];
+ }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
 }
 export async function listScriptPackages(projectId:string,planId?:string){if(planId)return(await requireDb().query("SELECT id,project_id,plan_id,version,status,model_id,pricing_free_verified,confidence,validation,created_at FROM creative_script_packages WHERE project_id=$1 AND plan_id=$2 ORDER BY version DESC",[projectId,planId])).rows;return(await requireDb().query("SELECT id,project_id,plan_id,version,status,model_id,pricing_free_verified,confidence,validation,created_at FROM creative_script_packages WHERE project_id=$1 ORDER BY created_at DESC",[projectId])).rows}
 export async function getScriptPackage(projectId:string,id:string){return(await requireDb().query("SELECT * FROM creative_script_packages WHERE project_id=$1 AND id=$2",[projectId,id])).rows[0]??null}
