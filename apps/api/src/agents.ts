@@ -7,7 +7,8 @@ import {resolveAgentProvider} from "./agent-provider-router.js";
 
 type Json=JsonObject;
 const provider=()=>resolveAgentProvider();
-const model=()=>provider().model;
+const model=()=>{try{return provider().model}catch{return process.env.OPENROUTER_AGENT_MODEL?.trim()||"openrouter/auto"}};
+const providerId=()=>{try{return provider().id}catch{return "unconfigured"}};
 const prompts:Record<AgentRole,string>={
  "Improvisor":"You are AIVEDIO Improvisor: generate useful, grounded creative and production improvements. Return JSON {ideas:[{title,description,impact,risks}],recommendedDirection,assumptions}. Never claim facts unsupported by input.",
  "Implementation Agent":"You are AIVEDIO Implementation Agent. Convert the approved direction into a practical staged plan. Return JSON {steps:[{id,title,description,ownerRole,dependencies,acceptanceCriteria}],requirements,risks,rollback}. Avoid actions requiring external credentials or irreversible operations.",
@@ -24,7 +25,7 @@ function agentTrace(role:AgentRole,projectId:string){
   const content=typeof response.content==="string"?response.content:Array.isArray(response.content)?response.content.map(x=>typeof x==="string"?x:(x as any).text??"").join(""):"";
   if(!content.trim())throw new Error(role+" returned an empty response");
   return parseAgentJson(role,content)
- },{name:"AIVEDIO "+role,run_type:"llm",tracingEnabled:process.env.LANGSMITH_TRACING?.toLowerCase()==="true",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:provider().id,model:model()},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\s+/g,"-")]});
+ },{name:"AIVEDIO "+role,run_type:"llm",tracingEnabled:process.env.LANGSMITH_TRACING?.toLowerCase()==="true",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:providerId(),model:model()},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\s+/g,"-")]});
 }
 function normalizeBrief(value:unknown){return typeof value==="string"?value.slice(0,20000):""}
 
@@ -45,7 +46,7 @@ async function runAgentPipelineInternal(projectId:string,userId:string,input:Jso
  try{await client.query("BEGIN");await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[projectId]);row=(await client.query("INSERT INTO agent_pipeline_runs(project_id,created_by,input,improvisor,implementation_plan,audit,patch,status) VALUES($1,$2,$3,$4,$5,$6,$7,'awaiting_approval') RETURNING *",[projectId,userId,context,improvisor,implementation,audit,patch])).rows[0];await client.query("COMMIT")}catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
  return row;
 }
-const tracedPipeline=traceable(async(args:{projectId:string;userId:string;input:Json})=>runAgentPipelineInternal(args.projectId,args.userId,args.input),{name:"AIVEDIO Agent Pipeline",run_type:"chain",tracingEnabled:process.env.LANGSMITH_TRACING?.toLowerCase()==="true",metadata:{framework:"langchain",provider:provider().id,pipeline:"improvisor-implementation-patcher-auditor"},tags:["aivedio","agent-pipeline","hitl"]});
+const tracedPipeline=traceable(async(args:{projectId:string;userId:string;input:Json})=>runAgentPipelineInternal(args.projectId,args.userId,args.input),{name:"AIVEDIO Agent Pipeline",run_type:"chain",tracingEnabled:process.env.LANGSMITH_TRACING?.toLowerCase()==="true",metadata:{framework:"langchain",provider:providerId(),pipeline:"improvisor-implementation-patcher-auditor"},tags:["aivedio","agent-pipeline","hitl"]});
 export async function runAgentPipeline(projectId:string,userId:string,input:Json){return tracedPipeline({projectId,userId,input})}
 export async function listAgentRuns(projectId:string){return(await requireDb().query("SELECT id,status,input,improvisor,implementation_plan,audit,patch,human_decision,human_notes,decided_at,applied_at,created_at,updated_at FROM agent_pipeline_runs WHERE project_id=$1 ORDER BY created_at DESC",[projectId])).rows}
 export async function getAgentRun(projectId:string,runId:string){return(await requireDb().query("SELECT * FROM agent_pipeline_runs WHERE project_id=$1 AND id=$2",[projectId,runId])).rows[0]??null}
