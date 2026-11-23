@@ -36,6 +36,7 @@ app.addHook("onRequest",async(request,reply)=>{
  reply.header("X-Frame-Options","DENY");
  reply.header("Referrer-Policy","no-referrer");
  reply.header("Permissions-Policy","camera=(),microphone=(),geolocation=()");
+});
 app.addHook("preHandler",async(request,reply)=>{
  const origin=request.headers.origin;
  if(origin&&allowedOrigins.includes(origin)){reply.header("Access-Control-Allow-Origin",origin);reply.header("Vary","Origin");reply.header("Access-Control-Allow-Headers","Authorization,Content-Type");reply.header("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");}
