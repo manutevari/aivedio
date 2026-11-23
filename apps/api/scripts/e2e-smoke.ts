@@ -138,6 +138,23 @@ try{
  assert.equal(crossProjectAssetReview.status,404,"Direct asset ID must not bypass project ownership");
  const nestedCrossProjectAnalysis=await fetch(baseUrl+"/v1/projects/"+project.id+"/assets/"+isolatedAsset.rows[0].id+"/analyze",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({kinds:["metadata"]})});
  assert.equal(nestedCrossProjectAnalysis.status,400,"Project-scoped asset operation must reject a foreign asset ID");
+ // Phase 22 cross-project resource-ownership regressions.
+ await request("POST",`/v1/projects/${project.id}/members`,{email:"reviewer@ci.aivedio.test",role:"editor"},201);
+ const ownedTrack=await request("POST",`/v1/projects/${project.id}/timeline/tracks`,{name:"Ownership test track",kind:"video"},201);
+ const foreignTrack=await db.query("INSERT INTO timeline_tracks(project_id,name,kind) VALUES($1,'Foreign audio track','audio') RETURNING id",[isolatedProject.id]);
+ const foreignSubtitle=await db.query("INSERT INTO subtitle_cues(project_id,start_ms,end_ms,text) VALUES($1,0,1000,'foreign subtitle marker') RETURNING id",[isolatedProject.id]);
+ const subtitleCollision=await fetch(baseUrl+`/v1/projects/${project.id}/subtitles`,{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({id:foreignSubtitle.rows[0].id,startMs:0,endMs:1000,text:"attempted overwrite"})});
+ assert.equal(subtitleCollision.status,400,"Subtitle upsert must reject IDs owned by another project");
+ const subtitleAfter=await db.query("SELECT project_id,text FROM subtitle_cues WHERE id=$1",[foreignSubtitle.rows[0].id]);
+ assert.equal(subtitleAfter.rows[0].project_id,isolatedProject.id,"Cross-project subtitle collision must preserve ownership");assert.equal(subtitleAfter.rows[0].text,"foreign subtitle marker","Cross-project subtitle collision must not overwrite content");
+ const foreignAssetClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign asset attempt",kind:"video",assetId:isolatedAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
+ assert.equal(foreignAssetClip.status,400,"Timeline clip creation must reject assets owned by another project");
+ const foreignScene=await db.query("INSERT INTO scenes(project_id,title,prompt) VALUES($1,'Foreign scene fixture','') RETURNING id",[isolatedProject.id]);
+ const foreignSceneClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign scene attempt",kind:"video",sceneId:foreignScene.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
+ assert.equal(foreignSceneClip.status,400,"Timeline clip creation must reject scenes owned by another project");
+ const foreignMix=await fetch(baseUrl+`/v1/projects/${project.id}/audio-mix`,{method:"PUT",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({trackId:foreignTrack.rows[0].id,gainDb:0,muted:false})});
+ assert.equal(foreignMix.status,400,"Audio mix settings must reject tracks owned by another project");
+
  const reviewerEdit=await fetch(baseUrl+`/v1/projects/${project.id}`,{method:"PATCH",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Unauthorized change"})});
  assert.equal(reviewerEdit.status,403,"Reviewer cannot edit project");
  const planRow=await request("POST",`/v1/projects/${project.id}/creative-plans`,{
