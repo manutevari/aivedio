@@ -43,6 +43,8 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
+      - name: Core creative-plan duration regression tests
+        run: pnpm --filter @aivedio/api exec tsx --test ../../packages/core/src/creative-director.test.ts
       - name: Build
         run: pnpm build
       - name: Apply migrations to disposable CI database
