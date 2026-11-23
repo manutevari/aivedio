@@ -116,6 +116,13 @@ try{
  assert.equal(forbiddenTransition.status,403,"Workflow state transitions are restricted to admins/trusted workers");
  const forbiddenCheckpoint=await fetch(baseUrl+"/v1/workflows/"+workerRun.id+"/checkpoints",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({nodeId:"test",payload:{}})});
  assert.equal(forbiddenCheckpoint.status,403,"Workflow checkpoints are restricted to admins/trusted workers");
+ const reviewerJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status) VALUES($1,'video','ci-fixture','review actor binding','awaiting_approval','pending') RETURNING id",[project.id]);
+ const forbiddenJobTransition=await fetch(baseUrl+"/v1/generation-jobs/"+reviewerJob.rows[0].id+"/transition",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({status:"completed",result:{spoofed:true}})});
+ assert.equal(forbiddenJobTransition.status,403,"Project reviewer cannot impersonate generation worker");
+ const approvedJob=await fetch(baseUrl+"/v1/generation-jobs/"+reviewerJob.rows[0].id+"/review",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",reviewer:"spoofed-reviewer",notes:"CI authorization test"})});
+ assert.equal(approvedJob.status,200,"Reviewer can perform human approval");
+ const boundReviewer=await db.query("SELECT reviewer FROM generation_reviews WHERE job_id=$1 ORDER BY created_at DESC LIMIT 1",[reviewerJob.rows[0].id]);
+ assert.equal(boundReviewer.rows[0].reviewer,"reviewer@ci.aivedio.test","Reviewer identity must be derived from session, not request body");
  await db.query("INSERT INTO project_memory(project_id,kind,content,tags,importance) VALUES(NULL,'ci','private global accessaudit marker',ARRAY['ci'],0.9),($1,'ci','project scoped accessaudit marker',ARRAY['ci'],0.9)",[project.id]);
  const scopedMemory=await fetch(baseUrl+`/v1/memory/search?q=accessaudit&projectId=${project.id}`,{headers:{Authorization:"Bearer "+second.token}});
  assert.equal(scopedMemory.status,200);
