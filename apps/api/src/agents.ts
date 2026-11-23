@@ -1,4 +1,3 @@
-import {createHash} from "node:crypto";
 import {requireDb} from "./db.js";
 
 type Json=Record<string,unknown>;
@@ -45,4 +44,4 @@ export async function applyApprovedBriefPatch(projectId:string,runId:string,user
  await client.query("COMMIT");return{runId,status:"applied",target:patch.target,summary:patch.summary};
  }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
 }
-export function hashResetToken(token:string){return createHash("sha256").update(token).digest("hex")}
+
