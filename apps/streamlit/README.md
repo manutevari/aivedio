@@ -12,7 +12,7 @@ streamlit run app.py
 
 Configure `AIVEDIO_API_URL` (default `http://localhost:3000`) to connect to the Node API. The UI gracefully shows offline status if the API is unavailable. It reads the API base URL from Streamlit secrets first, then the `AIVEDIO_API_URL` environment variable.
 
-This is a UI foundation only: generation, persistent projects, authentication, and production safety classification are not yet connected.
+The Streamlit UI includes API-backed sign-in, account creation (if enabled by the API), forgot-password and reset-password flows, project selection, and agent-pipeline HITL controls. Other production features may still be incomplete.
 
 ## Streamlit Cloud secrets
 
@@ -52,5 +52,9 @@ Optional API environment:
 - `LANGSMITH_API_KEY` (LangSmith key)
 - `LANGSMITH_PROJECT=aivedio-agent-pipeline`
 - `LANGSMITH_ENDPOINT=https://api.smith.langchain.com`
+- `LANGSMITH_HIDE_INPUTS=true`
+- `LANGSMITH_HIDE_OUTPUTS=true`
 
-When tracing is enabled, LangSmith can collect agent inputs/outputs, prompts and metadata depending on SDK settings. Do not enable it for sensitive projects unless your data-retention/privacy settings are reviewed. Keep keys server-side. Streamlit only calls the API and does not need LangChain or LangSmith keys.
+Tracing is explicitly enabled only when `LANGSMITH_TRACING=true`. The pipeline creates separate LangSmith runs for each named agent, tagged with role, project ID, framework, provider, and configured model. Input/output hiding defaults are recommended: do not send creative briefs, personal data, credentials, or other sensitive content to tracing without reviewing your LangSmith workspace retention and access settings. Streamlit only calls the API and does not need LangChain or LangSmith keys.
+
+The Streamlit login screenshot showing only a sign-in form and the administrator-provisioning message does not match this branch's current four-tab account screen. That strongly suggests the deployed Streamlit app is running an older revision or different branch/configuration. Confirm the Streamlit Cloud repository, branch, app entrypoint (`apps/streamlit/app.py`), and deployment commit before changing account credentials. A sign-in failure itself does not distinguish a wrong password from a missing/disabled account.
