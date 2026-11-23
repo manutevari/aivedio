@@ -47,6 +47,8 @@ jobs:
         run: pnpm --filter @aivedio/api exec tsx --test ../../packages/core/tests/creative-director.test.ts
       - name: Build
         run: pnpm build
+      - name: Build API container
+        run: docker build -f Dockerfile.api -t aivedio-api-ci .
       - name: Apply migrations to disposable CI database
         run: pnpm --filter @aivedio/api test:migrate
       - name: Agent output validation tests
