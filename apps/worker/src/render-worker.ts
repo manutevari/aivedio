@@ -25,8 +25,8 @@ async function run(j:any){
  const manifest=j.manifest as RenderManifest;if(!manifest)throw new Error("Render job has no immutable manifest snapshot");
  const v=(await import("@aivedio/core")).validateRenderManifest(manifest);if(!v.valid)throw new Error(v.errors.join("; "));
  await fs.mkdir(outRoot,{recursive:true});
- const final=path.join(outRoot,j.id+"."+manifest.profile.container),temp=final+".partial";
- const subPath=path.join(outRoot,j.id+".srt");
+ const final=path.join(outRoot,j.id+"-attempt-"+j.attempt+"."+manifest.profile.container),temp=final+".partial";
+ const subPath=path.join(outRoot,j.id+"-attempt-"+j.attempt+".srt");
  const clips=[...manifest.videoClips,...manifest.audioClips];const paths=clips.map(c=>resolveMediaPath(c.storageKey,root));
  for(const p of paths){const real=await fs.realpath(p);const realRoot=await fs.realpath(root);if(!real.startsWith(realRoot+path.sep))throw new Error("Media symlink resolves outside MEDIA_ROOT");await fs.access(real);}
  if(manifest.subtitleMode!=="none"&&manifest.subtitles.length)await fs.writeFile(subPath,srt(manifest),"utf8");
@@ -47,7 +47,8 @@ async function run(j:any){
  await fs.rename(temp,final);
  const checksum=await new Promise<string>((resolve,reject)=>{const hash=crypto.createHash("sha256"),stream=createReadStream(final);stream.on("data",chunk=>hash.update(chunk));stream.on("error",reject);stream.on("end",()=>resolve(hash.digest("hex")))});const stat=await fs.stat(final);
  const sidecar=manifest.subtitleMode==="sidecar"&&manifest.subtitles.length?await fs.stat(subPath):null;
- await pool.query("UPDATE render_jobs SET status='awaiting_review',stage='rendered',progress=1,output_storage_key=$2,output_checksum=$3,output_size_bytes=$4,qa_status=$5,qa_report=$6,review_status='pending',lease_owner=NULL,lease_expires_at=NULL,completed_at=now(),updated_at=now() WHERE id=$1 AND lease_owner=$7",[j.id,path.relative(outRoot,final),checksum,stat.size,qaStatus,{findings,probeSummary:{duration:actualDuration,width:video?.width,height:video?.height,videoCodec:video?.codec_name,audioCodec:audio?.codec_name},sidecar:sidecar?path.relative(outRoot,subPath):null},workerId]);
+ const persisted=await pool.query("UPDATE render_jobs SET status='awaiting_review',stage='rendered',progress=1,output_storage_key=$2,output_checksum=$3,output_size_bytes=$4,qa_status=$5,qa_report=$6,review_status='pending',lease_owner=NULL,lease_expires_at=NULL,completed_at=now(),updated_at=now() WHERE id=$1 AND lease_owner=$7",[j.id,path.relative(outRoot,final),checksum,stat.size,qaStatus,{findings,probeSummary:{duration:actualDuration,width:video?.width,height:video?.height,videoCodec:video?.codec_name,audioCodec:audio?.codec_name},sidecar:sidecar?path.relative(outRoot,subPath):null},workerId]);
+ if(persisted.rowCount!==1)throw new Error("Render worker lease lost during persistence");
  console.log("Render ready for review",j.id,stat.size,qaStatus);
 }
 async function fail(j:any,e:unknown){
