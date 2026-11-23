@@ -24,6 +24,8 @@ import {createProductionCut,listProductionCuts,getProductionCut,applyProductionC
 import {createAudioPlan,listAudioPlans,getAudioPlan,updateAudioCue,reviewAudioPlan,applyAudioPlan,requestAudioAnalysis,listAudioAnalysis,listAudioAnalysisJobs,getAudioAnalysis,saveDucking} from "./audio-intelligence.js";
 import {createRenderJobFromTimeline} from "./rendering.js";
 import {reviewRenderJob} from "./timeline.js";
+import {runAgentPipeline,listAgentRuns,getAgentRun,decideAgentRun,applyApprovedBriefPatch} from "./agents.js";
+import {requestPasswordReset,resetPassword} from "./auth.js";
 
 
 
@@ -160,11 +162,19 @@ app.get("/v1/projects/:id/render-jobs",async(request)=>listRenderJobs((request.p
 app.get("/v1/render-jobs/:id",async(request)=>getRenderJob((request.params as {id:string}).id));
 
 app.post("/v1/auth/bootstrap",async(request,reply)=>{try{const b=request.body as any;return reply.status(201).send(await bootstrapAdmin(b?.bootstrapKey,b?.email,b?.password,b?.displayName,request.headers["user-agent"],request.ip))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/auth/forgot-password",async(request,reply)=>{const b=request.body as any;try{await requestPasswordReset(b?.email)}catch(error){request.log.error(error)}return reply.send({message:"If an account exists, password reset instructions have been sent."})});
+app.post("/v1/auth/reset-password",async(request,reply)=>{try{const b=request.body as any;await resetPassword(b?.token,b?.password);return reply.send({message:"Password reset successfully. Please sign in again."})}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:"Password reset failed"})}});
+
 app.post("/v1/auth/register",async(request,reply)=>{try{const b=request.body as any;return reply.status(201).send(await registerUser(b?.email,b?.password,b?.displayName,request.headers["user-agent"],request.ip))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.post("/v1/auth/login",async(request,reply)=>{try{const b=request.body as any;return await loginUser(b?.email,b?.password,request.headers["user-agent"],request.ip)}catch(e){return reply.status(401).send({error:"Invalid email or password"})}});
 app.get("/v1/auth/me",async(request)=>({user:(request as any).user}));
 app.post("/v1/auth/logout",async(request,reply)=>{const token=request.headers.authorization?.slice(7)??"";await revokeSession(token);return reply.code(204).send()});
 app.post("/v1/projects/:id/transfer-owner",async(request,reply)=>{try{const user=(request as any).user as AuthUser;if(user.global_role!=="admin")return reply.code(403).send({error:"Admin role required"});const p=request.params as any;const b=request.body as any;return await transferProjectOwnership(p.id,b?.userId,user.id)}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/agent-pipeline/runs",async(request,reply)=>{try{const p=request.params as any;const user=(request as any).user as AuthUser;return reply.status(201).send(await runAgentPipeline(p.id,user.id,request.body as any??{}))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/agent-pipeline/runs",async(request)=>listAgentRuns((request.params as any).id));
+app.get("/v1/projects/:id/agent-pipeline/runs/:runId",async(request,reply)=>{const p=request.params as any;const row=await getAgentRun(p.id,p.runId);if(!row)return reply.code(404).send({error:"Agent run not found"});return row});
+app.post("/v1/projects/:id/agent-pipeline/runs/:runId/decision",async(request,reply)=>{try{const p=request.params as any,b=request.body as any,user=(request as any).user as AuthUser;if(!["approve","reject"].includes(b?.decision))return reply.code(400).send({error:"Decision must be approve or reject"});return decideAgentRun(p.id,p.runId,user.id,b.decision,b.notes)}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/agent-pipeline/runs/:runId/apply",async(request,reply)=>{try{const p=request.params as any,user=(request as any).user as AuthUser;return await applyApprovedBriefPatch(p.id,p.runId,user.id)}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/role",async(request,reply)=>{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(!role)return reply.code(404).send({error:"Project not found"});return{role}});
 app.get("/v1/projects/:id/members",async(request,reply)=>{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(!role)return reply.code(404).send({error:"Project not found"});if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});return listProjectMembers(id)});
 app.post("/v1/projects/:id/members",async(request,reply)=>{try{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});const b=request.body as any;if(!["editor","reviewer","viewer"].includes(b?.role))return reply.code(400).send({error:"Invalid member role"});return reply.status(201).send(await addProjectMember(id,b.email,b.role,user.id))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
