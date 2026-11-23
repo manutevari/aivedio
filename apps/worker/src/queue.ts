@@ -2,7 +2,7 @@ import pg from "pg";
 import {WorkerJob,validateGeneratedAsset,assessGenerationResult} from "@aivedio/core";
 import {getAdapter,registeredAdapterIds} from "./adapters.js";
 const {Pool}=pg;
-export const pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:false}:undefined});
+export const pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:true}:undefined});
 const WORKER_ID=process.env.WORKER_ID??"aivedio-worker-"+process.pid;
 const LEASE_SECONDS=Number(process.env.WORKER_LEASE_SECONDS??300);
 export async function claimNextJob():Promise<WorkerJob|null>{
