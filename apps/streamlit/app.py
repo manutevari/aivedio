@@ -38,6 +38,15 @@ if "aivedio_session" not in st.session_state:
 
 if not st.session_state.aivedio_session:
     st.title("AIVEDIO · Account")
+    if API.startswith(("http://localhost", "http://127.0.0.1")):
+        st.warning(api_connection_message())
+    else:
+        try:
+            health=requests.get(API+"/health",timeout=5)
+            health.raise_for_status()
+            st.caption("API connection: online")
+        except requests.RequestException:
+            st.error(api_connection_message())
     auth_tab=st.tabs(["Sign in","Create account","Forgot password","Reset password"])
     with auth_tab[0]:
         with st.form("login_form"):
@@ -59,8 +68,12 @@ if not st.session_state.aivedio_session:
                     st.error("The AIVEDIO API is having a server error. Check API health and deployment logs.")
                 else:
                     st.error(f"Sign-in request failed (HTTP {status or 'unknown'}). Check API URL and deployment.")
+            except requests.ConnectionError:
+                st.error(api_connection_message())
+            except requests.Timeout:
+                st.error("The API request timed out. Check API health and retry.")
             except requests.RequestException:
-                st.error("Cannot reach the AIVEDIO API. Check AIVEDIO_API_URL and API availability.")
+                st.error(api_connection_message())
     with auth_tab[1]:
         with st.form("register_form"):
             register_email=st.text_input("Email")
@@ -72,15 +85,27 @@ if not st.session_state.aivedio_session:
                 session=api("/v1/auth/register","POST",{"email":register_email,"password":register_password,"displayName":register_name})
                 st.session_state.aivedio_session=session["token"]
                 st.rerun()
-            except Exception as exc: st.error(str(exc))
+            except requests.ConnectionError: st.error(api_connection_message())
+            except requests.Timeout: st.error("The API request timed out. Check API health and retry.")
+            except requests.HTTPError as exc:
+                status=exc.response.status_code if exc.response is not None else "unknown"
+                detail=exc.response.text[:500] if exc.response is not None else "API error"
+                st.error(f"Registration failed (HTTP {status}): {detail}")
+            except Exception as exc: st.error(f"Registration failed: {exc}")
     with auth_tab[2]:
         with st.form("forgot_form"):
             forgot_email=st.text_input("Account email")
             submit_forgot=st.form_submit_button("Send reset link")
         if submit_forgot:
-            try: api("/v1/auth/forgot-password","POST",{"email":forgot_email})
-            except Exception: pass
-            st.info("If an account exists, reset instructions have been sent.")
+            try:
+                api("/v1/auth/forgot-password","POST",{"email":forgot_email})
+                st.info("If an account exists, reset instructions have been sent.")
+            except requests.ConnectionError:
+                st.error(api_connection_message())
+            except requests.Timeout:
+                st.error("The API request timed out. Check API health and retry.")
+            except Exception:
+                st.info("If an account exists, reset instructions have been sent.")
     with auth_tab[3]:
         with st.form("reset_form"):
             reset_token=st.text_input("Reset token")
@@ -90,7 +115,9 @@ if not st.session_state.aivedio_session:
             try:
                 api("/v1/auth/reset-password","POST",{"token":reset_token,"password":new_password})
                 st.success("Password reset. Sign in again.")
-            except Exception as exc: st.error(str(exc))
+            except requests.ConnectionError: st.error(api_connection_message())
+            except requests.Timeout: st.error("The API request timed out. Check API health and retry.")
+            except Exception as exc: st.error(f"Password reset failed: {exc}")
     st.stop()
 
 if "project" not in st.session_state:
