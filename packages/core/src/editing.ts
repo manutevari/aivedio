@@ -1,4 +1,4 @@
-import {TimelineClip,TimelineTrack,RenderProfile} from "./timeline.js";
+import {TimelineClip,TimelineTrack,RenderProfile,validateTimelineClip} from "./timeline.js";
 export type TransitionName="cut"|"fade"|"dissolve"|"wipeleft"|"wiperight"|"slideleft"|"slideright";
 export interface TransitionSpec{type:TransitionName;durationMs:number}
 export interface AudioMixSettings{trackId:string;gainDb:number;muted:boolean;ducking?:{enabled:boolean;thresholdDb:number;ratio:number;attackMs:number;releaseMs:number}}
