@@ -84,6 +84,12 @@ jobs:
         run: pnpm --filter @aivedio/api test:security
       - name: API production workflow E2E smoke
         run: pnpm --filter @aivedio/api test:e2e
+      - name: FastAPI adapter tests
+        run: |
+          python -m pip install -e "apps/fastapi-adapter[test]"
+          python -m pytest -q apps/fastapi-adapter/tests
+      - name: FastAPI adapter syntax check
+        run: python -m compileall -q apps/fastapi-adapter/app apps/fastapi-adapter/tests
       - name: Python syntax check
         run: |
           python -m compileall -q apps/streamlit apps/asset-worker apps/audio-worker apps/qa-worker
