@@ -5,9 +5,10 @@ export async function upsertProvider(p:ProviderDescriptor){const validation=vali
 export async function routeRequest(input:RoutingRequest){return routeCapability(await listProviders(),input)}
 export async function createGenerationJob(input:{projectId:string;sceneId?:string;task:string;providerId:string;prompt:string;inputAssets?:string[];parameters?:Record<string,unknown>}){
  const db=requireDb();
+ if(!input.projectId?.trim()||!input.task?.trim()||!input.prompt?.trim()||input.prompt.length>20000)throw new Error("Project, task and a prompt under 20,000 characters are required");
  if(input.sceneId){const scene=await db.query("SELECT id FROM scenes WHERE id=$1 AND project_id=$2",[input.sceneId,input.projectId]);if(!scene.rowCount)throw new Error("Scene must belong to the requested project")}
  const ids=[...new Set(input.inputAssets??[])];
- if(ids.length){const assets=await db.query("SELECT id,status FROM media_assets WHERE project_id=$1 AND id=ANY($2::uuid[])",[input.projectId,ids]);if(assets.rowCount!==ids.length)throw new Error("All input assets must belong to the requested project");if(assets.rows.some((a:any)=>a.status==="deleted"))throw new Error("Deleted input assets cannot be used")}
+ if(ids.length){const assets=await db.query("SELECT id,status FROM media_assets WHERE project_id=$1 AND id=ANY($2::uuid[])",[input.projectId,ids]);if(assets.rowCount!==ids.length)throw new Error("All input assets must belong to the requested project");if(assets.rows.some((a:any)=>a.status!=="ready"))throw new Error("Only released input assets can be used for generation")}
  const provider=await db.query("SELECT provider_id FROM media_providers WHERE provider_id=$1",[input.providerId]);if(!provider.rowCount)throw new Error("Generation provider is not registered");
  return(await db.query("INSERT INTO generation_jobs(project_id,scene_id,task,provider_id,prompt,input_assets,parameters,status,safety_status) VALUES($1,$2,$3,$4,$5,$6,$7,'awaiting_approval','pending') RETURNING *",[input.projectId,input.sceneId??null,input.task,input.providerId,input.prompt,ids,input.parameters??{}])).rows[0]
 }
