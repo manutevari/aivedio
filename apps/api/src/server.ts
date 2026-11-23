@@ -214,4 +214,5 @@ app.get('/v1/projects/:id/asset-analysis/:jobId',async(request,reply)=>{const j=
 app.get('/v1/projects/:id/assets/:assetId/intelligence',async(request,reply)=>{try{return await getAssetIntelligence((request.params as {id:string;assetId:string}).id,(request.params as {assetId:string}).assetId)}catch(e){return reply.status(404).send({error:e instanceof Error?e.message:String(e)})}});
 app.get('/v1/projects/:id/assets/:assetId/keyframes',async(request)=>listKeyframes((request.params as {id:string;assetId:string}).id,(request.params as {assetId:string}).assetId));
 app.get('/v1/projects/:id/media-search',async(request)=>{const q=request.query as {q?:string;limit?:string};return searchMediaChunks((request.params as {id:string}).id,q.q??'',Number(q.limit)||10)});
-const port=Number(process.env.PORT??3000);await app.listen({port,host:"0.0.0.0"});
+export {app};
+if(!process.env.VERCEL){const port=Number(process.env.PORT??3000);await app.listen({port,host:"0.0.0.0"});}
