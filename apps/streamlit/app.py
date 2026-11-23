@@ -64,7 +64,7 @@ with st.sidebar:
         st.success(api("/health").get("status","connected"))
     except Exception:
         st.error("API offline · persistence disabled")
-    page=st.radio("Workspace",["Overview","Creative Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs"])
+    page=st.radio("Workspace",["Overview","Team","Creative Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs"])
     st.divider()
     new_title=st.text_input("New production title")
     new_brief=st.text_area("Creative brief",height=100)
@@ -115,6 +115,28 @@ else:
             st.write(f"**{name}** · {count}")
         st.info("Safety, technical QA and delivery approval are separate gates.")
 
+    elif page=="Team":
+        role=safe(f"/v1/projects/{project_id}/role",{}).get("role","unknown")
+        st.subheader("Project members")
+        st.info(f"Your role: **{role}**")
+        members=safe(f"/v1/projects/{project_id}/members",[])
+        if role=="owner":
+            with st.form("invite_member"):
+                invite_email=st.text_input("Existing account email")
+                invite_role=st.selectbox("Role",["editor","reviewer","viewer"])
+                invite=st.form_submit_button("Add member")
+            if invite and invite_email.strip():
+                action(lambda:api(f"/v1/projects/{project_id}/members","POST",{"email":invite_email,"role":invite_role}),"Member added")
+                st.rerun()
+        for member in members:
+            cols=st.columns([3,1,1])
+            cols[0].write(f"**{member.get('display_name') or member['email']}**")
+            cols[1].write(member["role"])
+            if role=="owner" and member["role"]!="owner" and cols[2].button("Remove",key="remove-member-"+member["user_id"]):
+                action(lambda:api(f"/v1/projects/{project_id}/members/{member['user_id']}","DELETE"),"Member removed")
+                st.rerun()
+        if role!="owner":
+            st.caption("Only the project owner can manage members.")
     elif page=="Creative Plan":
         st.subheader("Creative Director")
         with st.form("plan_form"):
