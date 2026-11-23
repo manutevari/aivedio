@@ -32,19 +32,50 @@ if "aivedio_session" not in st.session_state:
     st.session_state.aivedio_session=""
 
 if not st.session_state.aivedio_session:
-    st.title("AIVEDIO · Sign in")
-    with st.form("login_form"):
-        login_email=st.text_input("Email")
-        login_password=st.text_input("Password",type="password")
-        submit_login=st.form_submit_button("Sign in")
-    if submit_login:
-        try:
-            session=api("/v1/auth/login","POST",{"email":login_email,"password":login_password})
-            st.session_state.aivedio_session=session["token"]
-            st.rerun()
-        except Exception:
-            st.error("Sign-in failed. Check your credentials or contact the administrator.")
-    st.caption("Accounts are provisioned by your AIVEDIO administrator.")
+    st.title("AIVEDIO · Account")
+    auth_tab=st.tabs(["Sign in","Create account","Forgot password","Reset password"])
+    with auth_tab[0]:
+        with st.form("login_form"):
+            login_email=st.text_input("Email",key="auth_login_email")
+            login_password=st.text_input("Password",type="password",key="auth_login_password")
+            submit_login=st.form_submit_button("Sign in")
+        if submit_login:
+            try:
+                session=api("/v1/auth/login","POST",{"email":login_email,"password":login_password})
+                st.session_state.aivedio_session=session["token"]
+                st.rerun()
+            except Exception:
+                st.error("Sign-in failed. Check your credentials.")
+    with auth_tab[1]:
+        with st.form("register_form"):
+            register_email=st.text_input("Email")
+            register_password=st.text_input("Password (12+ characters)",type="password")
+            register_name=st.text_input("Display name")
+            submit_register=st.form_submit_button("Create account")
+        if submit_register:
+            try:
+                session=api("/v1/auth/register","POST",{"email":register_email,"password":register_password,"displayName":register_name})
+                st.session_state.aivedio_session=session["token"]
+                st.rerun()
+            except Exception as exc: st.error(str(exc))
+    with auth_tab[2]:
+        with st.form("forgot_form"):
+            forgot_email=st.text_input("Account email")
+            submit_forgot=st.form_submit_button("Send reset link")
+        if submit_forgot:
+            try: api("/v1/auth/forgot-password","POST",{"email":forgot_email})
+            except Exception: pass
+            st.info("If an account exists, reset instructions have been sent.")
+    with auth_tab[3]:
+        with st.form("reset_form"):
+            reset_token=st.text_input("Reset token")
+            new_password=st.text_input("New password (12+ characters)",type="password")
+            submit_reset=st.form_submit_button("Reset password")
+        if submit_reset:
+            try:
+                api("/v1/auth/reset-password","POST",{"token":reset_token,"password":new_password})
+                st.success("Password reset. Sign in again.")
+            except Exception as exc: st.error(str(exc))
     st.stop()
 
 if "project" not in st.session_state:
