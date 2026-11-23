@@ -237,3 +237,17 @@
 - [ ] Query-history and cache write ownership policy
 - [ ] Full nested-resource authorization tests
 - [ ] Trusted proxy/IP and shared rate-limit deployment configuration
+
+## Phase 22 — Production Security & Reliability (in progress)
+- [x] Bounded in-memory auth rate limiter with max bucket cap and expired-bucket cleanup
+- [x] Login attempts limited to 8 per IP+route per 15 minutes; bootstrap/register limited to 4
+- [x] 429 responses include Retry-After
+- [x] Unit tests for limit enforcement, expiry and memory cap
+- [x] CI runs auth/security tests
+- [ ] Replace in-memory auth rate limiter with shared persistent/distributed limiter before multi-instance deployment
+- [ ] Audit every endpoint for authorization scope and resource ownership
+- [ ] Audit file upload, path handling and signed delivery links
+- [ ] Add session management / revoke-all and account disable flow
+- [ ] Add CSRF protection if cookie-based sessions are introduced
+- [ ] Add dependency/SBOM and secret scanning CI
+- [ ] Production deployment, rollback and migration rehearsal
