@@ -123,6 +123,13 @@ try{
  assert.ok(memoryRows.results.some((m:any)=>m.content.includes("project scoped")));
  assert.equal(memoryRows.results.some((m:any)=>m.content.includes("private global")),false,"Project memory search must not leak global memory rows");
  const reviewerMembers=await fetch(baseUrl+`/v1/projects/${project.id}/members`,{headers:{Authorization:"Bearer "+second.token}});assert.equal(reviewerMembers.status,403,"Reviewer cannot manage project members");
+ const isolatedProject=await request("POST","/v1/projects",{title:"CI isolated resource fixture",mode:"flow",creativeBrief:"Ownership boundary regression fixture"},201);
+ const isolatedJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status) VALUES($1,'video','ci-fixture','ownership boundary fixture','completed','approved','pass') RETURNING id",[isolatedProject.id]);
+ const isolatedAsset=await db.query("INSERT INTO media_assets(project_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata) VALUES($1,$2,'video','ready','ci-fixture','isolated/asset.mp4','video/mp4',1,'{}'::jsonb) RETURNING id",[isolatedProject.id,isolatedJob.rows[0].id]);
+ const crossProjectAssetReview=await fetch(baseUrl+"/v1/assets/"+isolatedAsset.rows[0].id+"/review",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",reviewer:"spoofed"})});
+ assert.equal(crossProjectAssetReview.status,404,"Direct asset ID must not bypass project ownership");
+ const nestedCrossProjectAnalysis=await fetch(baseUrl+"/v1/projects/"+project.id+"/assets/"+isolatedAsset.rows[0].id+"/analyze",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({kinds:["metadata"]})});
+ assert.equal(nestedCrossProjectAnalysis.status,400,"Project-scoped asset operation must reject a foreign asset ID");
  const reviewerEdit=await fetch(baseUrl+`/v1/projects/${project.id}`,{method:"PATCH",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({title:"Unauthorized change"})});
  assert.equal(reviewerEdit.status,403,"Reviewer cannot edit project");
  const planRow=await request("POST",`/v1/projects/${project.id}/creative-plans`,{
