@@ -28,7 +28,6 @@ import {reviewRenderJob} from "./timeline.js";
 
 const app=Fastify({logger:true});
 const securityConfig=loadApiSecurityConfig(process.env);
-const apiToken=securityConfig.apiToken;
 const allowedOrigins=securityConfig.allowedOrigins;
 app.addHook("onRequest",async(request,reply)=>{
  const origin=request.headers.origin;
