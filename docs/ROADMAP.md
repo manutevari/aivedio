@@ -213,4 +213,14 @@
 - [ ] Complete resource ownership audit and authorization for all non-project-scoped endpoints
 - [ ] Login rate limiting, account recovery, email verification and session management UI
 - [ ] UI membership/invitation management
-- [ ] CI authentication and RBAC E2E test verification
+- [x] CI authentication/RBAC E2E verification: bootstrap, login, logout/revocation, cross-project isolation, reviewer read-only, owner membership and reviewer identity binding (CI green on commit 6019b516)
+
+## Phase 22 — Security Audit & Studio Membership UX
+- [ ] Complete route-by-route authorization matrix and tests for every resource endpoint
+- [ ] Login rate limiting and abuse protection
+- [ ] Session management/revocation UI and account recovery
+- [ ] Admin user management and invitation flow
+- [ ] Studio project members panel (invite/remove/change roles)
+- [ ] Derive all audit actors from session identity and remove caller-supplied actor fields
+- [ ] Security headers/CSP and production secrets/rotation documentation
+- [ ] Migration rehearsal, release checklist and rollback plan
