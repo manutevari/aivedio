@@ -1,5 +1,5 @@
 {
   "installCommand": "corepack enable && corepack prepare pnpm@10.26.1 --activate && pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter @aivedio/api build",
+  "buildCommand": "pnpm --filter @aivedio/core build && pnpm --filter @aivedio/api build",
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }
