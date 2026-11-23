@@ -53,7 +53,8 @@ export async function requestPasswordReset(emailInput:string){
  const email=emailNorm(String(emailInput??""));if(!email||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return;
  const user=(await requireDb().query("SELECT id,email FROM users WHERE lower(email)=$1 AND disabled_at IS NULL",[email])).rows[0];
  const emailApi=process.env.RESEND_API_KEY,from=process.env.AIVEDIO_EMAIL_FROM;if(!emailApi||!from)return;
- const token=randomBytes(32).toString("base64url"),digest=createHmac("sha256",process.env.AIVEDIO_SESSION_SECRET!).update("password-reset:"+token).digest("hex");
+ const secret=process.env.AIVEDIO_SESSION_SECRET;if(!secret||secret.length<32)return;
+ const token=randomBytes(32).toString("base64url"),digest=createHmac("sha256",secret).update("password-reset:"+token).digest("hex");
  const expires=new Date(Date.now()+30*60*1000);
  const base=(process.env.AIVEDIO_WEB_URL||process.env.AIVEDIO_SITE_URL||"http://localhost:5173").replace(/\/$/,"");
  const link=base+"/?resetToken="+encodeURIComponent(token);
@@ -64,7 +65,7 @@ export async function requestPasswordReset(emailInput:string){
 export async function resetPassword(tokenInput:string,passwordInput:string){
  const token=String(tokenInput??"").trim();if(token.length<20||token.length>200)throw new Error("Invalid or expired reset token");
  const password=validPassword(passwordInput);const hash=await hashPassword(password);
- const digest=createHmac("sha256",process.env.AIVEDIO_SESSION_SECRET!).update("password-reset:"+token).digest("hex");
+ const secret=process.env.AIVEDIO_SESSION_SECRET;if(!secret||secret.length<32)throw new Error("Password reset is not configured");const digest=createHmac("sha256",secret).update("password-reset:"+token).digest("hex");
  const client=await requireDb().connect();
  try{await client.query("BEGIN");const row=(await client.query("SELECT user_id FROM password_reset_tokens WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() FOR UPDATE",[digest])).rows[0];if(!row)throw new Error("Invalid or expired reset token");
  await client.query("UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1",[row.user_id]);
