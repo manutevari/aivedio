@@ -34,7 +34,7 @@ app.addHook("onRequest",async(request,reply)=>{
  if(origin&&allowedOrigins.includes(origin)){reply.header("Access-Control-Allow-Origin",origin);reply.header("Vary","Origin");reply.header("Access-Control-Allow-Headers","Authorization,Content-Type");reply.header("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");}
  if(request.method==="OPTIONS")return reply.code(204).send();
  if(request.url==="/health"||request.url==="/ready")return;
- const pathname=request.url.split("?")[0];
+ const pathname=request.url.split("?")[0]??"/";
  if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap"].includes(pathname))return;
  const bearer=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
  let user:AuthUser|null=null;
@@ -46,7 +46,7 @@ app.addHook("onRequest",async(request,reply)=>{
  const queryProject=(request.query as any)?.projectId;const bodyProject=(request.body as any)?.projectId;if(!projectId&&queryProject)projectId=String(queryProject);if(!projectId&&bodyProject)projectId=String(bodyProject);
  if(!projectId){
   const tableByType:Record<string,string>={assets:"media_assets","generation-jobs":"generation_jobs","render-jobs":"render_jobs",scenes:"scenes",subtitles:"subtitles"};
-  const kind=parts[1],id=parts[2]??parts[1],table=tableByType[kind];
+  const kind=parts[1]??"",id=parts[2]??kind,table=tableByType[kind];
   if(table&&id){try{const r=await requireDb().query("SELECT project_id FROM "+table+" WHERE id=$1",[id]);projectId=r.rows[0]?.project_id}catch{}}
   if(kind==="timeline"&&parts[2]==="tracks"&&parts[3]){try{const r=await requireDb().query("SELECT project_id FROM timeline_tracks WHERE id=$1",[parts[3]]);projectId=r.rows[0]?.project_id}catch{}}
   if(kind==="timeline"&&parts[2]==="clips"&&parts[3]){try{const r=await requireDb().query("SELECT t.project_id FROM timeline_clips c JOIN timeline_tracks t ON t.id=c.track_id WHERE c.id=$1",[parts[3]]);projectId=r.rows[0]?.project_id}catch{}}
