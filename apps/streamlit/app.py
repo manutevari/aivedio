@@ -19,6 +19,11 @@ def safe(path,default):
     except Exception:
         return default
 
+def api_connection_message():
+    if API.startswith(("http://localhost", "http://127.0.0.1")):
+        return "AIVEDIO API is configured as localhost. On Streamlit Cloud, localhost is the Streamlit container—not your API server. Deploy the API service and set AIVEDIO_API_URL in Streamlit Cloud → App settings → Secrets."
+    return f"Cannot connect to the AIVEDIO API at {API}. Verify AIVEDIO_API_URL, that the API is running, and that its /health endpoint is reachable."
+
 def action(fn,message):
     try:
         result=fn()
