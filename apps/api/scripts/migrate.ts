@@ -20,7 +20,7 @@ async function main(){
    checksum TEXT NOT NULL,
    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
-  const files=(await readdir(migrationsDir)).filter(name=>/^\\d+_[a-z0-9_-]+\\.sql$/i.test(name)).sort();
+  const files=(await readdir(migrationsDir)).filter(name=>/^\d+_[a-z0-9_-]+\.sql$/i.test(name)).sort();
   if(!files.length)throw new Error("No SQL migration files were found");
   for(const filename of files){
    const source=await readFile(new URL("../src/migrations/"+filename,import.meta.url),"utf8");
