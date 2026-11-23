@@ -84,10 +84,14 @@ def process(j):
  report={"status":st,"score":sc,"findings":fs,"metrics":profile,"safety":safety,"decision":{"action":action,"reasons":["Safety classifier not configured; human review required"]}}
  with db() as c:
   with c.cursor() as cur:
+   cur.execute("SELECT status,lease_owner FROM quality_jobs WHERE id=%s FOR UPDATE",(j["id"],))
+   lease=cur.fetchone()
+   if not lease or lease["status"]!="processing" or lease["lease_owner"]!=WORKER_ID:raise RuntimeError("Quality worker lease lost")
    cur.execute("INSERT INTO quality_reports(project_id,asset_id,job_id,stage,status,score,action,safety_verdict,report) VALUES(%s,%s,%s,'technical',%s,%s,%s,%s,%s) RETURNING id",(j["project_id"],a["id"],j["id"],st,sc,action,safety["verdict"],json.dumps(report)))
    rid=cur.fetchone()["id"]
    cur.execute("INSERT INTO safety_reviews(project_id,asset_id,report_id,stage,verdict,reason_codes,policy_version) VALUES(%s,%s,%s,%s,%s,%s,%s)",(j["project_id"],a["id"],rid,"asset",safety["verdict"],json.dumps(safety["reasonCodes"]),safety["policyVersion"]))
-   cur.execute("UPDATE quality_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s",(j["id"],))
+   cur.execute("UPDATE quality_jobs SET status='completed',lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=%s AND lease_owner=%s",(j["id"],WORKER_ID))
+   if cur.rowcount!=1:raise RuntimeError("Quality worker lease lost during persistence")
 def fail(j,e):
  with db() as c:
   with c.cursor() as cur:
