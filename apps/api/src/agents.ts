@@ -22,7 +22,7 @@ function agentTrace(role:string,projectId:string){
   const content=typeof response.content==="string"?response.content:Array.isArray(response.content)?response.content.map(x=>typeof x==="string"?x:(x as any).text??"").join(""):"";
   if(!content.trim())throw new Error(role+" returned an empty response");
   try{return JSON.parse(content)}catch{throw new Error(role+" returned invalid JSON")}
- },{name:"AIVEDIO "+role,run_type:"llm",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:"openrouter"},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\\s+/g,"-")]});
+ },{name:"AIVEDIO "+role,run_type:"llm",tracingEnabled:process.env.LANGSMITH_TRACING?.toLowerCase()==="true",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:"openrouter",model:model()},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\s+/g,"-")]});
 }
 function normalizeBrief(value:unknown){return typeof value==="string"?value.slice(0,20000):""}
 
