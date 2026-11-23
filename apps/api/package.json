@@ -9,7 +9,8 @@
     "test:migrate": "tsx scripts/migrate.ts",
     "test:e2e": "tsx scripts/e2e-smoke.ts",
     "test:security": "tsx --test scripts/security-config.test.ts scripts/auth-rate-limit.test.ts",
-    "lint": "echo 'Linting not configured yet'"
+    "lint": "echo 'Linting not configured yet'",
+    "test:agents": "tsx --test scripts/agent-validation.test.ts"
   },
   "dependencies": {
     "@aivedio/core": "workspace:*",
