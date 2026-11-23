@@ -25,7 +25,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://aivedio:aivedio_ci@localhost:5432/aivedio_test
-      AIVEDIO_API_TOKEN: ci-test-token-not-for-production
+      AIVEDIO_SESSION_SECRET: ci-session-secret-at-least-32-characters-long
+      AIVEDIO_BOOTSTRAP_ADMIN_KEY: ci-bootstrap-key-at-least-32-characters-long
+      AIVEDIO_ALLOW_SELF_REGISTRATION: "true"
       AIVEDIO_E2E_PORT: 3419
     steps:
       - uses: actions/checkout@v4
