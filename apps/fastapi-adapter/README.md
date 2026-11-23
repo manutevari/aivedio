@@ -5,7 +5,8 @@ This is a thin reverse-proxy adapter. The authoritative API remains the existing
 ## FastAPI Cloud configuration
 
 - App/root directory: `apps/fastapi-adapter`
-- Entrypoint: `app.main:app` (explicitly configured in `pyproject.toml`)
+- Entrypoint: `main.py` exports `app` for default discovery; canonical module is `app.main:app` (also explicitly configured in `pyproject.toml`)
+- Set FastAPI Cloud's app directory to `apps/fastapi-adapter` so the root shim is discoverable
 - Required secret/environment variable: `AIVEDIO_UPSTREAM_API_URL` = base URL of the deployed Fastify API (no trailing slash)
 - Optional: `AIVEDIO_PROXY_TIMEOUT_SECONDS` (default 30)
 
