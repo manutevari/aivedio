@@ -1,5 +1,6 @@
 import {requireDb} from "./db.js";
-export async function listGenerationJobs(projectId?:string){const db=requireDb();if(projectId)return(await db.query("SELECT * FROM generation_jobs WHERE project_id=$1 ORDER BY created_at DESC LIMIT 100",[projectId])).rows;return(await db.query("SELECT * FROM generation_jobs ORDER BY created_at DESC LIMIT 100")).rows}
+import type {AuthUser} from "./auth.js";
+export async function listGenerationJobs(projectId:string|undefined,user:AuthUser){const db=requireDb();if(user.global_role==="admin"&&!projectId)return(await db.query("SELECT * FROM generation_jobs ORDER BY created_at DESC LIMIT 100")).rows;if(projectId)return(await db.query("SELECT * FROM generation_jobs WHERE project_id=$1 ORDER BY created_at DESC LIMIT 100",[projectId])).rows;return(await db.query("SELECT j.* FROM generation_jobs j JOIN project_members pm ON pm.project_id=j.project_id WHERE pm.user_id=$1 ORDER BY j.created_at DESC LIMIT 100",[user.id])).rows}
 export async function reviewGenerationJob(id:string,input:{decision:"approve"|"reject";reviewer:string;notes?:string}){
  const db=requireDb(),client=await db.connect();try{await client.query("BEGIN");const r=await client.query("SELECT * FROM generation_jobs WHERE id=$1 FOR UPDATE",[id]);if(!r.rowCount)throw new Error("Generation job not found");const job=r.rows[0];if(job.status!=="awaiting_approval")throw new Error("Job is not awaiting approval");
  const approved=input.decision==="approve";const status=approved?"queued":"cancelled";const safety=approved?"approved":"rejected";
@@ -14,4 +15,4 @@ export async function reviewAsset(id:string,input:{decision:"approve"|"reject";r
  const status=input.decision==="approve"?"ready":"deleted";const u=await client.query("UPDATE media_assets SET status=$2 WHERE id=$1 RETURNING *",[id,status]);if(a.job_id)await client.query("INSERT INTO generation_reviews(job_id,stage,status,reason_codes,reviewer,notes) VALUES($1,'asset_release',$2,$3,$4,$5)",[a.job_id,status,[input.decision==="approve"?"ASSET_RELEASED":"ASSET_REJECTED"],input.reviewer,input.notes??null]);await client.query("COMMIT");return u.rows[0]
  }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
 }
-export async function listProjectAssetsGlobal(){return(await requireDb().query("SELECT * FROM media_assets ORDER BY created_at DESC LIMIT 200")).rows}
+export async function listProjectAssetsGlobal(user:AuthUser){if(user.global_role==="admin")return(await requireDb().query("SELECT * FROM media_assets ORDER BY created_at DESC LIMIT 200")).rows;return(await requireDb().query("SELECT a.* FROM media_assets a JOIN project_members pm ON pm.project_id=a.project_id WHERE pm.user_id=$1 ORDER BY a.created_at DESC LIMIT 200",[user.id])).rows}
