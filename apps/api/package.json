@@ -6,6 +6,7 @@
   "typecheck":"tsc --noEmit -p tsconfig.json",
   "test:migrate":"tsx scripts/migrate.ts",
   "test:e2e":"tsx scripts/e2e-smoke.ts",
+  "test:security":"tsx --test scripts/security-config.test.ts",
   "lint":"echo 'Linting not configured yet'"
  },
  "dependencies":{"@aivedio/core":"workspace:*","fastify":"^5.2.1","pg":"^8.13.1"},
