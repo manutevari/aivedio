@@ -1,8 +1,8 @@
 # Agent Worker Orchestration and Router
 
-The worker now has an explicit agent registry, dependency graph validator, deterministic task router, retry budget, and human-approval pause semantics.
+The worker now has an explicit agent registry including a supervisor role, dependency graph validator, deterministic task router, retry budget, and human-approval pause semantics.
 
-- Agents register by role; duplicate registrations fail.
+- Agents register by role; duplicate registrations fail. The supervisor role can be scheduled after other tasks to review their results and enforce workflow gates.
 - Tasks have IDs, role, dependencies, input, retry budget, and optional HITL gate.
 - Graph validation rejects duplicate IDs, missing dependencies, and cycles before execution.
 - Tasks execute only when dependencies complete. Failed/blocked upstream tasks prevent downstream execution.
