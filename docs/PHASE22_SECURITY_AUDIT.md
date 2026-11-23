@@ -29,5 +29,8 @@
 - [x] Workflow transition and checkpoint mutation endpoints are restricted to admin/trusted-worker authority (current implementation uses admin as the trusted boundary).
 - [x] E2E regression tests for provider-route authorization and workflow transition/checkpoint denial to project reviewers.
 - [ ] Introduce a dedicated worker service credential/role instead of using admin as the worker boundary.
-- [ ] Continue audit of nested project-scoped child IDs and confirm all service-level SQL validates project ownership.
+- [x] Confirm asset analysis service validates projectId + assetId before queueing.
+- [x] E2E regression: foreign asset ID cannot be reviewed by non-member.
+- [x] E2E regression: nested asset-analysis operation rejects a foreign asset ID.
+- [ ] Continue audit of remaining nested project-scoped child IDs and confirm all service-level SQL validates project ownership.
 - [ ] Test direct resource cross-project attempts for each mapped resource type.
