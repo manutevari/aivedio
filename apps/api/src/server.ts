@@ -62,6 +62,11 @@ app.addHook("preHandler",async(request,reply)=>{
  }
  if(projectId&&request.body&&typeof request.body==="object"&&(request.method==="POST"||request.method==="PUT"||request.method==="PATCH"))(request.body as any).createdBy=user.email;
  if(request.body&&typeof request.body==="object"&&/(review|approve|safety-review)$/.test(pathname))(request.body as any).reviewer=user.email;
+ if(user.global_role!=="admin"){
+  if(pathname==="/v1/providers"||pathname==="/v1/providers/discovered"||pathname.startsWith("/v1/intelligence/cache/"))return reply.code(403).send({error:"Admin role required"});
+  if(pathname==="/v1/memory/search"&&!projectId)return reply.code(403).send({error:"Project scope required"});
+  if(pathname.startsWith("/v1/workflows/")&&!projectId)return reply.code(403).send({error:"Project scope required"});
+ }
  if(!projectId&&request.method!=="GET"&&pathname!=="/v1/projects"&&pathname!=="/v1/auth/logout"&&user.global_role!=="admin")return reply.code(403).send({error:"Admin role required for global mutation"});
  if(projectId){
   const role=await getProjectRole(user,projectId);if(!role)return reply.code(404).send({error:"Project not found"});
@@ -109,7 +114,7 @@ app.post("/v1/decision/evaluate",async(request)=>decideNextAction(request.body a
 app.post("/v1/intelligence/analyze",async(request)=>{const body=request.body as {brief:string};if(!body?.brief?.trim())return {error:"brief required"};return analyzeCreativeBrief(body.brief);});
 app.post("/v1/intelligence/context-optimize",async(request)=>{const body=request.body as {items:Parameters<typeof optimizeContext>[0];maxChars?:number};return optimizeContext(body.items??[],body.maxChars);});
 app.post("/v1/memory",async(request,reply)=>{const body=request.body as Parameters<typeof saveMemory>[0];if(!body?.content?.trim())return reply.status(400).send({error:"content required"});return reply.status(201).send(await saveMemory(body));});
-app.get("/v1/memory/search",async(request)=>{const q=(request.query as {q?:string;projectId?:string;limit?:string});if(!q.q)return {results:[]};return {results:await searchMemory(q.q,q.projectId,Math.min(50,Math.max(1,Number(q.limit)||10)))};});
+app.get("/v1/memory/search",async(request)=>{const q=(request.query as {q?:string;projectId?:string;limit?:string});if(!q.q)return {results:[]};return {results:await searchMemory(q.q,q.projectId,Math.min(50,Math.max(1,Number(q.limit)||10)),((request as any).user as AuthUser).global_role==="admin")};});
 app.post("/v1/intelligence/query-log",async(request)=>logQuery(request.body as Parameters<typeof logQuery>[0]));
 app.get("/v1/intelligence/cache/:key",async(request)=>cacheGet((request.params as {key:string}).key));
 app.put("/v1/intelligence/cache/:key",async(request)=>{const body=request.body as {value:unknown;ttlSeconds?:number};return cacheSet((request.params as {key:string}).key,body.value,body.ttlSeconds);});
