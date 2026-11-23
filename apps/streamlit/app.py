@@ -37,7 +37,7 @@ def safe(path,default):
 def api_connection_message():
     if API.startswith(("http://localhost", "http://127.0.0.1")):
         return "AIVEDIO API is configured as localhost. On Streamlit Cloud, localhost is the Streamlit container—not your API server. Deploy the API service and set AIVEDIO_API_URL in Streamlit Cloud → App settings → Secrets."
-    return f"Cannot connect to the AIVEDIO API at {API}. Verify AIVEDIO_API_URL, that the API is running, and that its /health endpoint is reachable."
+    return f"Cannot connect to the AIVEDIO API at {API}. Verify AIVEDIO_API_URL, that the API is running, and that its /ready endpoint is reachable."
 
 def action(fn,message):
     try:
@@ -57,7 +57,7 @@ if not st.session_state.aivedio_session:
         st.warning(api_connection_message())
     else:
         try:
-            health=requests.get(API+"/health",timeout=5)
+            health=requests.get(API+"/ready",timeout=5)
             health.raise_for_status()
             st.caption("API connection: online")
         except requests.RequestException:
@@ -149,7 +149,7 @@ with st.sidebar:
         st.session_state.aivedio_session=""
         st.rerun()
     try:
-        st.success(api("/health").get("status","connected"))
+        st.success(api("/ready").get("ready","connected"))
     except Exception:
         st.error("API offline · persistence disabled")
     page=st.radio("Workspace",["Overview","Team","Creative Plan","Script","Storyboard","Assets","Flow Library","Timeline","Audio","Quality & Safety","Renders","Generation Jobs","Agent Pipeline"])
