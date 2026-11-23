@@ -29,7 +29,7 @@ import {reviewRenderJob} from "./timeline.js";
 const app=Fastify({logger:true});
 const securityConfig=loadApiSecurityConfig(process.env);
 const allowedOrigins=securityConfig.allowedOrigins;
-app.addHook("onRequest",async(request,reply)=>{
+app.addHook("preHandler",async(request,reply)=>{
  const origin=request.headers.origin;
  if(origin&&allowedOrigins.includes(origin)){reply.header("Access-Control-Allow-Origin",origin);reply.header("Vary","Origin");reply.header("Access-Control-Allow-Headers","Authorization,Content-Type");reply.header("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");}
  if(request.method==="OPTIONS")return reply.code(204).send();
