@@ -6,46 +6,23 @@ import {requireDb} from "./db.js";
 type Json=Record<string,unknown>;
 const apiKey=()=>process.env.OPENROUTER_API_KEY?.trim();
 const model=()=>process.env.OPENROUTER_AGENT_MODEL?.trim()||"openrouter/auto";
-const tracingEnabled=()=>process.env.LANGCHAIN_TRACING_V2==="true"||process.env.LANGSMITH_TRACING==="true";
+const prompts:Record<string,string>={
+ "Improvisor":"You are AIVEDIO Improvisor: generate useful, grounded creative and production improvements. Return JSON {ideas:[{title,description,impact,risks}],recommendedDirection,assumptions}. Never claim facts unsupported by input.",
+ "Implementation Agent":"You are AIVEDIO Implementation Agent. Convert the approved direction into a practical staged plan. Return JSON {steps:[{id,title,description,ownerRole,dependencies,acceptanceCriteria}],requirements,risks,rollback}. Avoid actions requiring external credentials or irreversible operations.",
+ "Patcher":"You are AIVEDIO Patcher. Produce a minimal revised creative brief, not code or executable instructions. Preserve user intent and explicit constraints. Return JSON {target:'projects.creative_brief',before,after,summary,changeSet:[{type:'replace',description}],reversible:true}. 'after' must be a string and must never exceed 20000 characters. Preserve all required safety, legal and privacy constraints; never remove them.",
+ "Auditor":"You are a strict independent auditor. Independently inspect the brief patch AND implementation plan, including the proposed change set. Return JSON {verdict:'pass'|'needs_changes'|'fail',score:0-100,findings:[{severity:'critical'|'high'|'medium'|'low',finding,evidence,recommendation}],requiredHumanChecks,summary}. Never rubber-stamp. If proposal is vague, unsafe, unsupported or has critical issues, fail it."
+};
 function agentClient(role:string){
  const key=apiKey();if(!key)throw new Error("OPENROUTER_API_KEY is not configured on the AIVEDIO API server");
  return new ChatOpenAI({apiKey:key,model:model(),temperature:0.2,timeout:60000,maxRetries:2,configuration:{baseURL:"https://openrouter.ai/api/v1",defaultHeaders:{"HTTP-Referer":process.env.AIVEDIO_SITE_URL||"https://aivedio.local","X-Title":"AIVEDIO "+role}}});
 }
 function agentTrace(role:string,projectId:string){
  return traceable(async(input:unknown)=>{
-  const client=agentClient(role);
-  const response=await client.invoke([new SystemMessage(rolePrompt(role)),new HumanMessage(JSON.stringify(input))]);
+  const response=await agentClient(role).invoke([new SystemMessage(prompts[role]),new HumanMessage(JSON.stringify(input))]);
   const content=typeof response.content==="string"?response.content:Array.isArray(response.content)?response.content.map(x=>typeof x==="string"?x:(x as any).text??"").join(""):"";
   if(!content.trim())throw new Error(role+" returned an empty response");
   try{return JSON.parse(content)}catch{throw new Error(role+" returned invalid JSON")}
- },{name:"AIVEDIO "+role,run_type:"llm",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:"openrouter"},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\s+/g,"-")]});
-}
-const prompts:Record<string,string>={};
-function rolePrompt(role:string){return prompts[role]??"Return a JSON object only. Be grounded, concise, and do not invent facts."}
-
-
-import {ChatOpenAI} from "@langchain/openai";
-import {HumanMessage,SystemMessage} from "@langchain/core/messages";
-import {traceable} from "langsmith/traceable";
-import {requireDb} from "./db.js";
-
-type Json=Record<string,unknown>;
-const apiKey=()=>process.env.OPENROUTER_API_KEY?.trim();
-const model=()=>process.env.OPENROUTER_AGENT_MODEL?.trim()||"openrouter/auto";
-function agentClient(role:string){
- const key=apiKey();if(!key)throw new Error("OPENROUTER_API_KEY is not configured on the AIVEDIO API server");
- return new ChatOpenAI({apiKey:key,model:model(),temperature:0.2,timeout:60000,maxRetries:2,configuration:{baseURL:"https://openrouter.ai/api/v1",defaultHeaders:{"HTTP-Referer":process.env.AIVEDIO_SITE_URL||"https://aivedio.local","X-Title":"AIVEDIO "+role}}});
-}
-const prompts:Record<string,string>={"Improvisor":"You are AIVEDIO Improvisor: generate useful, grounded creative and production improvements. Return JSON {ideas:[{title,description,impact,risks}],recommendedDirection,assumptions}. Never claim facts unsupported by input.","Implementation Agent":"You are AIVEDIO Implementation Agent. Convert the approved direction into a practical staged plan. Return JSON {steps:[{id,title,description,ownerRole,dependencies,acceptanceCriteria}],requirements,risks,rollback}. Avoid actions requiring external credentials or irreversible operations.","Patcher":"You are AIVEDIO Patcher. Produce a minimal revised creative brief, not code or executable instructions. Preserve user intent and explicit constraints. Return JSON {target:'projects.creative_brief',before,after,summary,changeSet:[{type:'replace',description}],reversible:true}. 'after' must be a string and must never exceed 20000 characters. Preserve all required safety, legal and privacy constraints; never remove them.","Auditor":"You are a strict independent auditor. Independently inspect the brief patch AND implementation plan, including the proposed change set. Return JSON {verdict:'pass'|'needs_changes'|'fail',score:0-100,findings:[{severity:'critical'|'high'|'medium'|'low',finding,evidence,recommendation}],requiredHumanChecks,summary}. Never rubber-stamp. If proposal is vague, unsafe, unsupported or has critical issues, fail it."};
-function rolePrompt(role:string){return prompts[role]??"Return a JSON object only. Be grounded, concise, and do not invent facts."}
-
-function agentTrace(role:string,projectId:string){
- return traceable(async(input:unknown)=>{
-  const response=await agentClient(role).invoke([new SystemMessage(rolePrompt(role)),new HumanMessage(JSON.stringify(input))]);
-  const content=typeof response.content==="string"?response.content:Array.isArray(response.content)?response.content.map(x=>typeof x==="string"?x:(x as any).text??"").join(""):"";
-  if(!content.trim())throw new Error(role+" returned an empty response");
-  try{return JSON.parse(content)}catch{throw new Error(role+" returned invalid JSON")}
- },{name:"AIVEDIO "+role,run_type:"llm",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:"openrouter"},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\s+/g,"-")]});
+ },{name:"AIVEDIO "+role,run_type:"llm",metadata:{agent_role:role,project_id:projectId,framework:"langchain",provider:"openrouter"},tags:["aivedio","agent-pipeline",role.toLowerCase().replace(/\\s+/g,"-")]});
 }
 function normalizeBrief(value:unknown){return typeof value==="string"?value.slice(0,20000):""}
 
