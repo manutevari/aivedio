@@ -41,3 +41,16 @@ If you use Streamlit Cloud, add this in **App → Settings → Secrets**. For lo
 - `TAVILY_API_KEY` — optional research integration, if enabled.
 
 Never expose any of these secret values in logs, browser JavaScript, screenshots, or Git.
+
+## LangChain + LangSmith
+
+AIVEDIO API agents use LangChain's `ChatOpenAI` adapter with OpenRouter as the compatible provider. Improvisor, Implementation Agent, Patcher, and Auditor are separate named runs. LangSmith tracing is **opt-in** and configured only on the API deployment.
+
+Optional API environment:
+- `LANGSMITH_TRACING=true` (enable traces)
+- `LANGCHAIN_TRACING_V2=true` (legacy-compatible tracing flag)
+- `LANGSMITH_API_KEY` (LangSmith key)
+- `LANGSMITH_PROJECT=aivedio-agent-pipeline`
+- `LANGSMITH_ENDPOINT=https://api.smith.langchain.com`
+
+When tracing is enabled, LangSmith can collect agent inputs/outputs, prompts and metadata depending on SDK settings. Do not enable it for sensitive projects unless your data-retention/privacy settings are reviewed. Keep keys server-side. Streamlit only calls the API and does not need LangChain or LangSmith keys.
