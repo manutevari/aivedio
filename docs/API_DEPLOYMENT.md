@@ -24,11 +24,7 @@ Health checks:
 - `/health`: process health
 - `/ready`: database readiness
 
-Before first deployment, review and run migrations separately and deliberately:
-```bash
-pnpm --filter @ivedio/api test:migrate
-```
-Correct package filter is `@aivedio/api`:
+Before first deployment, review migrations and run them separately and deliberately (not from the container startup command):
 ```bash
 pnpm --filter @aivedio/api test:migrate
 ```
