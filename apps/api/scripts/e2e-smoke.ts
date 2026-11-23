@@ -69,6 +69,14 @@ try{
  assert.equal(unauth.status,401,"API must reject unauthenticated requests");
  const badLogin=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"wrong-password"})});
  assert.equal(badLogin.status,401,"Invalid credentials must be rejected");
+ const forgotExisting=await fetch(baseUrl+"/v1/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test"})});
+ const forgotUnknown=await fetch(baseUrl+"/v1/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"unknown@ci.aivedio.test"})});
+ assert.equal(forgotExisting.status,200,"Password recovery should respond generically");
+ assert.equal(forgotUnknown.status,200,"Unknown-account recovery should not disclose account existence");
+ assert.deepEqual(await forgotExisting.json(),await forgotUnknown.json(),"Password recovery response must be generic");
+ const badReset=await fetch(baseUrl+"/v1/auth/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:"invalid-reset-token",password:"New-CI-Password-123!"})});
+ assert.equal(badReset.status,400,"Invalid reset tokens must not reset passwords");
+
  for(let attempt=0;attempt<6;attempt++){
   const response=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
   assert.equal(response.status,401,"Invalid login attempt must be rejected");
