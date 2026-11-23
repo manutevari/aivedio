@@ -1,4 +1,4 @@
 import pg from "pg";
 const {Pool}=pg;
-export const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:false}:undefined}):null;
+export const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==="require"?{rejectUnauthorized:true}:undefined}):null;
 export function requireDb(): pg.Pool {if(!pool)throw new Error("DATABASE_URL is not configured");return pool as pg.Pool;}
