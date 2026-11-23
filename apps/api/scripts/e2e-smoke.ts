@@ -54,6 +54,14 @@ try{
  token=bootstrap.token;
  assert.ok(token,"Bootstrap must return a session token");
  await request("GET","/v1/auth/me",undefined,200);
+ const loginSession=await request("POST","/v1/auth/login",{email:"admin@ci.aivedio.test",password:adminPassword},200);
+ assert.ok(loginSession.token,"Login must return a session");
+ const loginMe=await fetch(baseUrl+"/v1/auth/me",{headers:{Authorization:"Bearer "+loginSession.token}});
+ assert.equal(loginMe.status,200);
+ const logout=await fetch(baseUrl+"/v1/auth/logout",{method:"POST",headers:{Authorization:"Bearer "+loginSession.token}});
+ assert.equal(logout.status,204);
+ const revoked=await fetch(baseUrl+"/v1/auth/me",{headers:{Authorization:"Bearer "+loginSession.token}});
+ assert.equal(revoked.status,401,"Revoked sessions must stop authenticating");
  await request("GET","/health",undefined,200);
  await request("GET","/ready",undefined,200);
  const unauth=await fetch(baseUrl+"/v1/projects");
