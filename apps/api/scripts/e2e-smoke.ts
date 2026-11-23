@@ -188,6 +188,9 @@ try{
  const unsafeClip=await request("POST",`/v1/timeline/tracks/${unsafeTrack.id}/clips`,{title:"Unsafe fixture",kind:"video",assetId:unsafeAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000},201);
  const unsafeRender=await fetch(baseUrl+`/v1/projects/${isolatedProject.id}/render-jobs`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({options:{subtitleMode:"none"}})});
  assert.equal(unsafeRender.status,400,"Render creation must reject assets with failed QA or uncleared safety review");
+ await db.query("UPDATE media_assets SET status='quarantined' WHERE id=$1",[unsafeAsset.rows[0].id]);
+ const unsafeAssetApproval=await fetch(baseUrl+"/v1/assets/"+unsafeAsset.rows[0].id+"/review",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",reviewer:"CI"})});
+ assert.equal(unsafeAssetApproval.status,400,"Asset release must reject failed technical QA and uncleared safety review");
  const foreignSceneClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign scene attempt",kind:"video",sceneId:foreignScene.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
  assert.equal(foreignSceneClip.status,400,"Timeline clip creation must reject scenes owned by another project");
  const foreignMix=await fetch(baseUrl+`/v1/projects/${project.id}/audio-mix`,{method:"PUT",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({trackId:foreignTrack.rows[0].id,gainDb:0,muted:false})});
