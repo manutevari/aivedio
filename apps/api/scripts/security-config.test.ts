@@ -1,0 +1,8 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {loadApiSecurityConfig} from "../src/security-config.js";
+test("development defaults to local Studio origins",()=>{const config=loadApiSecurityConfig({NODE_ENV:"development"});assert.deepEqual(config.allowedOrigins,["http://localhost:5173","http://localhost:8501"]);assert.equal(config.apiToken,undefined)});
+test("production rejects missing bearer token",()=>{assert.throws(()=>loadApiSecurityConfig({NODE_ENV:"production",AIVEDIO_ALLOWED_ORIGINS:"https://studio.example.com"}),/AIVEDIO_API_TOKEN/)});
+test("production rejects weak token and implicit CORS defaults",()=>{assert.throws(()=>loadApiSecurityConfig({NODE_ENV:"production",AIVEDIO_API_TOKEN:"short",AIVEDIO_ALLOWED_ORIGINS:"https://studio.example.com"}),/32 characters/);assert.throws(()=>loadApiSecurityConfig({NODE_ENV:"production",AIVEDIO_API_TOKEN:"x".repeat(32)}),/AIVEDIO_ALLOWED_ORIGINS/)});
+test("production accepts explicit strong token and exact HTTPS origins",()=>{const config=loadApiSecurityConfig({NODE_ENV:"production",AIVEDIO_API_TOKEN:"x".repeat(32),AIVEDIO_ALLOWED_ORIGINS:"https://studio.example.com,https://admin.example.com"});assert.equal(config.production,true);assert.equal(config.allowedOrigins.length,2)});
+test("production rejects wildcard, localhost, and origin paths",()=>{const env={NODE_ENV:"production",AIVEDIO_API_TOKEN:"x".repeat(32)};assert.throws(()=>loadApiSecurityConfig({...env,AIVEDIO_ALLOWED_ORIGINS:"*"}),/Wildcard/);assert.throws(()=>loadApiSecurityConfig({...env,AIVEDIO_ALLOWED_ORIGINS:"http://localhost:5173"}),/Localhost/);assert.throws(()=>loadApiSecurityConfig({...env,AIVEDIO_ALLOWED_ORIGINS:"https://studio.example.com/path"}),/exact origins/)});
