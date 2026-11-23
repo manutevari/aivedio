@@ -25,6 +25,7 @@ import {createAudioPlan,listAudioPlans,getAudioPlan,updateAudioCue,reviewAudioPl
 import {createRenderJobFromTimeline} from "./rendering.js";
 import {reviewRenderJob} from "./timeline.js";
 import {runAgentPipeline,listAgentRuns,getAgentRun,decideAgentRun,applyApprovedBriefPatch} from "./agents.js";
+import {agentProviderStatus} from "./agent-provider-router.js";
 import {requestPasswordReset,resetPassword} from "./auth.js";
 
 
@@ -122,6 +123,7 @@ app.put("/v1/projects/:id/audio-mix",async(request,reply)=>{try{return reply.sta
 
 
 
+app.get("/v1/admin/agent-providers",async(request,reply)=>{if((request as any).user?.global_role!=="admin")return reply.code(403).send({error:"Admin role required"});return {providers:agentProviderStatus(),selectedProvider:process.env.AIVEDIO_AGENT_PROVIDER||"auto"};});
 app.get("/health",async()=>({status:"ok",service:"aivedio-api",foundation:"phase-6",database:pool?"configured":"not_configured"}));
 app.get("/ready",async(_r,reply)=>{try{if(!pool)return reply.status(503).send({ready:false,reason:"DATABASE_URL missing"});await pool.query("SELECT 1");return {ready:true};}catch{return reply.status(503).send({ready:false,reason:"database unavailable"});}});
 app.post("/v1/workflow/classify",async(request)=>{const body=request.body as {type:string;risk?:"low"|"medium"|"high"|"critical"};return classifyNode(body.type,body.risk??"low");});
