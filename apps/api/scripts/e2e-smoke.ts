@@ -175,12 +175,6 @@ try{
  const foreignAssetClip=await fetch(baseUrl+`/v1/timeline/tracks/${ownedTrack.id}/clips`,{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({title:"Foreign asset attempt",kind:"video",assetId:isolatedAsset.rows[0].id,timelineDurationMs:1000,sourceDurationMs:1000})});
  assert.equal(foreignAssetClip.status,400,"Timeline clip creation must reject assets owned by another project");
  const foreignScene=await db.query("INSERT INTO scenes(project_id,scene_order,title,prompt) VALUES($1,999,'Foreign scene fixture','') RETURNING id",[isolatedProject.id]);
- const validGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,task:"video",prompt:"CI generation ownership test",freeOnly:false})});
- assert.equal(validGeneration.status,201,"Valid project generation job should be created with the test provider");
- const foreignSceneGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,sceneId:foreignScene.rows[0].id,task:"video",prompt:"Foreign scene attempt",freeOnly:false})});
- assert.equal(foreignSceneGeneration.status,400,"Generation jobs must reject scenes from another project");
- const foreignAssetGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,inputAssets:[isolatedAsset.rows[0].id],task:"video",prompt:"Foreign asset attempt",freeOnly:false})});
- assert.equal(foreignAssetGeneration.status,400,"Generation jobs must reject input assets from another project");
  const unsafeJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status) VALUES($1,'video','aivedio-ci-fixture','render release gate','completed','approved','pass') RETURNING id",[isolatedProject.id]);
  const unsafeAsset=await db.query("INSERT INTO media_assets(project_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata) VALUES($1,$2,'video','ready','ci-fixture','unsafe/render.mp4','video/mp4',1,'{}'::jsonb) RETURNING id",[isolatedProject.id,unsafeJob.rows[0].id]);
  await db.query("INSERT INTO quality_reports(project_id,asset_id,stage,status,score,action,safety_verdict,report) VALUES($1,$2,'asset','fail',0,'block','uncertain',$3::jsonb)",[isolatedProject.id,unsafeAsset.rows[0].id,JSON.stringify({fixture:true,findings:[{code:"CI_FAIL"}]})]);
@@ -241,6 +235,12 @@ try{
   [JSON.stringify({fixture:true,description:"CI-only synthetic media rows; no external provider call."})]
  );
  await db.query("UPDATE media_providers SET descriptor=$2::jsonb WHERE provider_id=$1",["aivedio-ci-fixture",JSON.stringify({id:"aivedio-ci-fixture",name:"AIVEDIO CI Fixture",source:"manual",capabilities:[{task:"video",inputs:["prompt"],outputs:["video"],maxDurationSeconds:120,aspectRatios:["16:9"],resolutions:["720p","1080p"],supportsReferences:true,supportsAudio:false}],authRequired:false,authConfigured:false,pricing:{free:true,verifiedAt:new Date().toISOString()},trust:{verified:true,score:100,notes:["Synthetic CI-only provider"]},availability:"available"})]);
+ const validGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,task:"video",prompt:"CI generation ownership test",freeOnly:false})});
+ assert.equal(validGeneration.status,201,"Valid project generation job should be created with the test provider");
+ const foreignSceneGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,sceneId:foreignScene.rows[0].id,task:"video",prompt:"Foreign scene attempt",freeOnly:false})});
+ assert.equal(foreignSceneGeneration.status,400,"Generation jobs must reject scenes from another project");
+ const foreignAssetGeneration=await fetch(baseUrl+"/v1/generation-jobs",{method:"POST",headers:{Authorization:"Bearer "+editorToken,"Content-Type":"application/json"},body:JSON.stringify({projectId:project.id,inputAssets:[isolatedAsset.rows[0].id],task:"video",prompt:"Foreign asset attempt",freeOnly:false})});
+ assert.equal(foreignAssetGeneration.status,400,"Generation jobs must reject input assets from another project");
  const assetAssignments:Record<string,string>={};
  const shots=plan.scenes.flatMap((scene:any)=>scene.shots.map((shot:any)=>({scene,shot})));
  for(const {scene,shot} of shots){
