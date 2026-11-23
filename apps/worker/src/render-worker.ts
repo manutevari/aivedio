@@ -12,7 +12,8 @@ const srtTime=(ms:number)=>{const n=Math.max(0,Math.round(ms));const h=Math.floo
 function srt(manifest:RenderManifest){return manifest.subtitles.map((c,i)=>`${i+1}\n${srtTime(c.startMs)} --> ${srtTime(c.endMs)}\n${c.text.replace(/\r?\n/g," ")}\n`).join("\n")}
 async function claim(){
  const c=await pool.connect();try{await c.query("BEGIN");
- const r=await c.query("SELECT * FROM render_jobs WHERE (status='queued' AND available_at<=now()) OR (status IN ('validating','rendering','uploading') AND lease_expires_at<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1");
+ await c.query("UPDATE render_jobs SET status='failed',stage='failed',error=COALESCE(error,'Render worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE status IN ('validating','rendering','uploading') AND lease_expires_at<now() AND attempt>=max_attempts");
+ const r=await c.query("SELECT * FROM render_jobs WHERE ((status='queued' AND available_at<=now()) OR (status IN ('validating','rendering','uploading') AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1");
  if(!r.rowCount){await c.query("COMMIT");return null}const j=r.rows[0];
  const u=await c.query("UPDATE render_jobs SET status='validating',attempt=attempt+1,lease_owner=$2,lease_expires_at=now()+interval '20 minutes',stage='validating',error=NULL,updated_at=now() WHERE id=$1 RETURNING *",[j.id,workerId]);await c.query("COMMIT");return u.rows[0];
  }catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}}
