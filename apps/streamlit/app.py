@@ -4,7 +4,7 @@ import streamlit as st
 
 API=str(st.secrets.get("AIVEDIO_API_URL",os.getenv("AIVEDIO_API_URL","http://localhost:3000"))).rstrip("/")
 st.set_page_config(page_title="AIVEDIO Studio",page_icon="🎬",layout="wide")
-st.markdown("""<style>.stApp{background:#080b14;color:#e7eaf5}[data-testid=stSidebar]{background:#0b0f1a}div[data-testid=stMetric]{background:#111827;border:1px solid #273149;padding:12px;border-radius:12px}</style>""",unsafe_allow_html=True)
+st.markdown("""<style>.stApp{background:#080b14;color:#e7eaf5}[data-testid=stSidebar]{background:#0b0f1a}div[data-testid=stMetric]{background:#111827;border:1px solid #273149;padding:12px;border-radius:12px}input,textarea,[data-baseweb="input"],[data-baseweb="textarea"]{background:#f8fafc!important;color:#111827!important;border-radius:10px!important}input::placeholder,textarea::placeholder{color:#64748b!important}button[kind="primary"],button[kind="secondary"],[data-testid="stFormSubmitButton"] button{background:#e5e7eb!important;color:#111827!important;border:1px solid #9ca3af!important;font-weight:600!important}button[kind="primary"]:hover,button[kind="secondary"]:hover{background:#cbd5e1!important;color:#0f172a!important}[data-testid="stTabs"] button{color:#e5e7eb!important;white-space:nowrap}</style>""",unsafe_allow_html=True)
 
 def api(path,method="GET",data=None):
     token=st.session_state.get("aivedio_session","")
@@ -47,6 +47,11 @@ if not st.session_state.aivedio_session:
             st.caption("API connection: online")
         except requests.RequestException:
             st.error(api_connection_message())
+    if API.startswith(("http://localhost", "http://127.0.0.1")):
+        st.info("Authentication is temporarily unavailable until the backend is connected. Configure AIVEDIO_API_URL in Streamlit Cloud Secrets with your deployed API HTTPS URL.")
+        st.code('AIVEDIO_API_URL = "https://your-api-host.example.com"',language="toml")
+        st.markdown("**Deployment checklist**\n1. Deploy the API service using `Dockerfile.api`.\n2. Confirm the API's `/health` endpoint is publicly reachable over HTTPS.\n3. Add the API URL to Streamlit Cloud → App settings → Secrets.\n4. Restart/reboot the Streamlit app.")
+        st.stop()
     auth_tab=st.tabs(["Sign in","Create account","Forgot password","Reset password"])
     with auth_tab[0]:
         with st.form("login_form"):
