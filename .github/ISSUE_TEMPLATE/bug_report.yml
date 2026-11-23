@@ -1,0 +1,54 @@
+name: Bug / Repair Request
+description: Report a defect for evidence-led RCA, repair, independent audit, and CAPA closure.
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+      placeholder: Clear, concise description.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs / screenshots / request IDs
+      description: Remove credentials, tokens, personal data, and secrets before attaching.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - S0 Critical
+        - S1 High
+        - S2 Medium
+        - S3 Low
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / version
+      placeholder: Preview or staging URL, commit SHA, browser/device, service name.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: I removed secrets and sensitive user data from the report.
+          required: true
