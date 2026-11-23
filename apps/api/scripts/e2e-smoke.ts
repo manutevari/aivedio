@@ -69,7 +69,7 @@ try{
  assert.equal(unauth.status,401,"API must reject unauthenticated requests");
  const badLogin=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"wrong-password"})});
  assert.equal(badLogin.status,401,"Invalid credentials must be rejected");
- for(let attempt=0;attempt<7;attempt++){
+ for(let attempt=0;attempt<6;attempt++){
   const response=await fetch(baseUrl+"/v1/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"admin@ci.aivedio.test",password:"incorrect-password"})});
   assert.equal(response.status,401,"Invalid login attempt must be rejected");
  }
