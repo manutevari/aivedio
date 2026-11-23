@@ -8,7 +8,8 @@ const LEASE_SECONDS=Number(process.env.WORKER_LEASE_SECONDS??300);
 export async function claimNextJob():Promise<WorkerJob|null>{
  const ids=registeredAdapterIds();if(!ids.length)return null;
  const client=await pool.connect();try{await client.query("BEGIN");
- const r=await client.query(`SELECT * FROM generation_jobs WHERE provider_id=ANY($1::text[]) AND status='queued' AND safety_status='approved' AND available_at<=now() AND (lease_expires_at IS NULL OR lease_expires_at<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`,[ids]);
+ await client.query(`UPDATE generation_jobs SET status='failed',error=COALESCE(error,'Worker lease expired after maximum attempts'),lease_owner=NULL,lease_expires_at=NULL,updated_at=now() WHERE provider_id=ANY($1::text[]) AND status='running' AND lease_expires_at<now() AND attempt>=max_attempts`,[ids]);
+ const r=await client.query(`SELECT * FROM generation_jobs WHERE provider_id=ANY($1::text[]) AND safety_status='approved' AND ((status='queued' AND available_at<=now()) OR (status='running' AND lease_expires_at<now() AND attempt<max_attempts)) ORDER BY available_at,created_at FOR UPDATE SKIP LOCKED LIMIT 1`,[ids]);
  if(!r.rowCount){await client.query("COMMIT");return null}
  const row=r.rows[0];const upd=await client.query("UPDATE generation_jobs SET status='running',lease_owner=$2,lease_expires_at=now()+($3||' seconds')::interval,attempt=attempt+1,started_at=COALESCE(started_at,now()),updated_at=now() WHERE id=$1 RETURNING *",[row.id,WORKER_ID,String(LEASE_SECONDS)]);
  await client.query("COMMIT");const j=upd.rows[0];return{id:j.id,projectId:j.project_id,sceneId:j.scene_id??undefined,task:j.task,providerId:j.provider_id,prompt:j.prompt,inputAssets:j.input_assets??[],parameters:j.parameters??{},status:j.status,attempt:j.attempt,maxAttempts:j.max_attempts,workerId:WORKER_ID,leaseExpiresAt:j.lease_expires_at?.toISOString(),safetyStatus:j.safety_status};
