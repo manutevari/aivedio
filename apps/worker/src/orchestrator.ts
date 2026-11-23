@@ -1,6 +1,6 @@
 import type { WorkerJob } from "@aivedio/core";
 
-export type AgentRole = "planner" | "improvisor" | "researcher" | "implementation" | "patcher" | "auditor" | "critic" | "safety" | "generator" | "renderer";
+export type AgentRole = "planner" | "improvisor" | "researcher" | "implementation" | "patcher" | "auditor" | "critic" | "safety" | "generator" | "renderer" | "supervisor";
 export type AgentStatus = "queued" | "running" | "completed" | "failed" | "blocked" | "awaiting_human";
 export interface AgentTask { id:string; role:AgentRole; dependencies?:string[]; input:unknown; requiresHumanApproval?:boolean; maxRetries?:number; }
 export interface AgentResult { status:AgentStatus; output?:unknown; confidence?:number; error?:string; requiresHumanApproval?:boolean; }
@@ -32,7 +32,7 @@ export async function orchestrateAgents(job:WorkerJob,tasks:AgentTask[],registry
   if(!ready.length){const blocked=[...pending.values()].filter(t=>(t.dependencies??[]).some(d=>["failed","blocked","awaiting_human"].includes(results.get(d)?.status??"")));for(const t of blocked)results.set(t.id,{status:"blocked",error:"Dependency did not complete"});return{status:"blocked",results:Object.fromEntries(results),completedOrder}}
   for(const task of ready){
    pending.delete(task.id);
-   const agent=registry.route(task);
+   const agent=registry.route(task.role);
    let result:AgentResult={status:"failed",error:"Agent did not return a result"};
    const retries=Math.max(0,Math.min(5,task.maxRetries??0));
    for(let attempt=0;attempt<=retries;attempt++){
