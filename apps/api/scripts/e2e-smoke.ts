@@ -117,7 +117,7 @@ try{
  const forbiddenCheckpoint=await fetch(baseUrl+"/v1/workflows/"+workerRun.id+"/checkpoints",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({nodeId:"test",payload:{}})});
  assert.equal(forbiddenCheckpoint.status,403,"Workflow checkpoints are restricted to admins/trusted workers");
  await db.query("INSERT INTO media_providers(provider_id,name,source,descriptor) VALUES('aivedio-ci-fixture','AIVEDIO CI Fixture','test',$1::jsonb) ON CONFLICT(provider_id) DO NOTHING",[JSON.stringify({fixture:true,description:"CI-only fixture provider"})]);
- const reviewerJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status) VALUES($1,'video','ci-fixture','review actor binding','awaiting_approval','pending') RETURNING id",[project.id]);
+ const reviewerJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status) VALUES($1,'video','aivedio-ci-fixture','review actor binding','awaiting_approval','pending') RETURNING id",[project.id]);
  const forbiddenJobTransition=await fetch(baseUrl+"/v1/generation-jobs/"+reviewerJob.rows[0].id+"/transition",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({status:"completed",result:{spoofed:true}})});
  assert.equal(forbiddenJobTransition.status,403,"Project reviewer cannot impersonate generation worker");
  const approvedJob=await fetch(baseUrl+"/v1/generation-jobs/"+reviewerJob.rows[0].id+"/review",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",reviewer:"spoofed-reviewer",notes:"CI authorization test"})});
@@ -132,7 +132,7 @@ try{
  assert.equal(memoryRows.results.some((m:any)=>m.content.includes("private global")),false,"Project memory search must not leak global memory rows");
  const reviewerMembers=await fetch(baseUrl+`/v1/projects/${project.id}/members`,{headers:{Authorization:"Bearer "+second.token}});assert.equal(reviewerMembers.status,403,"Reviewer cannot manage project members");
  const isolatedProject=await request("POST","/v1/projects",{title:"CI isolated resource fixture",mode:"flow",creativeBrief:"Ownership boundary regression fixture"},201);
- const isolatedJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status) VALUES($1,'video','ci-fixture','ownership boundary fixture','completed','approved','pass') RETURNING id",[isolatedProject.id]);
+ const isolatedJob=await db.query("INSERT INTO generation_jobs(project_id,task,provider_id,prompt,status,safety_status,quality_status) VALUES($1,'video','aivedio-ci-fixture','ownership boundary fixture','completed','approved','pass') RETURNING id",[isolatedProject.id]);
  const isolatedAsset=await db.query("INSERT INTO media_assets(project_id,job_id,kind,status,storage_provider,storage_key,mime_type,size_bytes,metadata) VALUES($1,$2,'video','ready','ci-fixture','isolated/asset.mp4','video/mp4',1,'{}'::jsonb) RETURNING id",[isolatedProject.id,isolatedJob.rows[0].id]);
  const crossProjectAssetReview=await fetch(baseUrl+"/v1/assets/"+isolatedAsset.rows[0].id+"/review",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",reviewer:"spoofed"})});
  assert.equal(crossProjectAssetReview.status,404,"Direct asset ID must not bypass project ownership");
