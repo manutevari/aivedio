@@ -7,7 +7,8 @@ st.set_page_config(page_title="AIVEDIO Studio",page_icon="🎬",layout="wide")
 st.markdown("""<style>.stApp{background:#080b14;color:#e7eaf5}[data-testid=stSidebar]{background:#0b0f1a}div[data-testid=stMetric]{background:#111827;border:1px solid #273149;padding:12px;border-radius:12px}</style>""",unsafe_allow_html=True)
 
 def api(path,method="GET",data=None):
-    headers={"Authorization":"Bearer "+os.getenv("AIVEDIO_API_TOKEN")} if os.getenv("AIVEDIO_API_TOKEN") else {}
+    token=st.session_state.get("aivedio_session","")
+    headers={"Authorization":"Bearer "+token} if token else {}
     response=requests.request(method,API+path,json=data,headers=headers,timeout=20)
     response.raise_for_status()
     return response.json() if response.content else None
@@ -27,6 +28,25 @@ def action(fn,message):
         st.error(str(exc))
         return None
 
+if "aivedio_session" not in st.session_state:
+    st.session_state.aivedio_session=""
+
+if not st.session_state.aivedio_session:
+    st.title("AIVEDIO · Sign in")
+    with st.form("login_form"):
+        login_email=st.text_input("Email")
+        login_password=st.text_input("Password",type="password")
+        submit_login=st.form_submit_button("Sign in")
+    if submit_login:
+        try:
+            session=api("/v1/auth/login","POST",{"email":login_email,"password":login_password})
+            st.session_state.aivedio_session=session["token"]
+            st.rerun()
+        except Exception:
+            st.error("Sign-in failed. Check your credentials or contact the administrator.")
+    st.caption("Accounts are provisioned by your AIVEDIO administrator.")
+    st.stop()
+
 if "project" not in st.session_state:
     st.session_state.project=None
 if "scene_id" not in st.session_state:
@@ -35,6 +55,11 @@ if "scene_id" not in st.session_state:
 with st.sidebar:
     st.title("🎬 AIVEDIO")
     st.caption("Universal AI Creative Studio")
+    if st.button("Sign out",use_container_width=True):
+        try: api("/v1/auth/logout","POST")
+        except Exception: pass
+        st.session_state.aivedio_session=""
+        st.rerun()
     try:
         st.success(api("/health").get("status","connected"))
     except Exception:
