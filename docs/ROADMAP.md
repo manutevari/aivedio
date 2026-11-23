@@ -225,3 +225,15 @@
 - [ ] Derive all audit actors from session identity and remove caller-supplied actor fields
 - [ ] Security headers/CSP and production secrets/rotation documentation
 - [ ] Migration rehearsal, release checklist and rollback plan
+
+## Phase 23 — API Authorization Surface Audit (in progress)
+- [x] Admin-only provider configuration/discovery listing
+- [x] Admin-only global intelligence-cache reads
+- [x] Require project scope for non-admin memory search
+- [x] Project-scoped memory search excludes global memory rows
+- [x] Unbound/global workflow event/checkpoint access restricted to admin
+- [x] E2E negative tests for provider/cache/global memory and memory isolation
+- [ ] Complete route/resource authorization matrix
+- [ ] Query-history and cache write ownership policy
+- [ ] Full nested-resource authorization tests
+- [ ] Trusted proxy/IP and shared rate-limit deployment configuration
