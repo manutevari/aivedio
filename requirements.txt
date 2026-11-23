@@ -1,0 +1,2 @@
+# Root-level dependencies for platforms that build from repository root.
+-r apps/fastapi-adapter/requirements.txt
