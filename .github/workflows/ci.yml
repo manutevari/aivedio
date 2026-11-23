@@ -49,6 +49,33 @@ jobs:
         run: pnpm build
       - name: Build API container
         run: docker build -f Dockerfile.api -t aivedio-api-ci .
+      - name: API container runtime health smoke
+        run: |
+          set -euo pipefail
+          container_name="aivedio-api-smoke"
+          cleanup() {
+            docker logs "$container_name" || true
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d --name "$container_name" -p 127.0.0.1:3419:3000 \
+            -e NODE_ENV=production \
+            -e PORT=3000 \
+            -e AIVEDIO_SESSION_SECRET=ci-session-secret-at-least-32-characters-long \
+            -e AIVEDIO_ALLOWED_ORIGINS=https://aivedio.streamlit.app \
+            aivedio-api-ci
+
+          for i in {1..30}; do
+            if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:3419/health; then
+              echo "API container health smoke passed"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "API container did not become healthy within 60 seconds" >&2
+          exit 1
       - name: Apply migrations to disposable CI database
         run: pnpm --filter @aivedio/api test:migrate
       - name: Agent output validation tests
