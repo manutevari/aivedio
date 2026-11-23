@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import {timingSafeEqual} from "node:crypto";
+import {loadApiSecurityConfig} from "./security-config.js";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
 import {createAssetQualityJob,listQualityJobs,listQualityReports,getQualityReport,runContinuityReview,applySafetyReview,listSafetyReviews} from './quality.js';
 import {enrichCreativePlan,listScriptPackages,getScriptPackage,reviewScriptPackage} from './scriptwriting.js';
@@ -25,9 +26,9 @@ import {reviewRenderJob} from "./timeline.js";
 
 
 const app=Fastify({logger:true});
-const apiToken=process.env.AIVEDIO_API_TOKEN;
-if(process.env.NODE_ENV==="production"&&!apiToken)throw new Error("AIVEDIO_API_TOKEN must be configured in production");
-const allowedOrigins=(process.env.AIVEDIO_ALLOWED_ORIGINS??"http://localhost:5173,http://localhost:8501").split(",").map(x=>x.trim()).filter(Boolean);
+const securityConfig=loadApiSecurityConfig(process.env);
+const apiToken=securityConfig.apiToken;
+const allowedOrigins=securityConfig.allowedOrigins;
 app.addHook("onRequest",async(request,reply)=>{
  const origin=request.headers.origin;
  if(origin&&allowedOrigins.includes(origin)){
