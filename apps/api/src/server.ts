@@ -29,13 +29,20 @@ import {reviewRenderJob} from "./timeline.js";
 const app=Fastify({logger:true});
 const securityConfig=loadApiSecurityConfig(process.env);
 const allowedOrigins=securityConfig.allowedOrigins;
+const authAttemptBuckets=new Map<string,{count:number;resetAt:number}>();
+function allowAuthAttempt(key:string,limit:number,windowMs:number){const now=Date.now();for(const [k,v] of authAttemptBuckets)if(v.resetAt<=now)authAttemptBuckets.delete(k);const current=authAttemptBuckets.get(key);if(!current||current.resetAt<=now){authAttemptBuckets.set(key,{count:1,resetAt:now+windowMs});return true}if(current.count>=limit)return false;current.count++;return true}
+app.addHook("onRequest",async(request,reply)=>{
+ reply.header("X-Content-Type-Options","nosniff");
+ reply.header("X-Frame-Options","DENY");
+ reply.header("Referrer-Policy","no-referrer");
+ reply.header("Permissions-Policy","camera=(),microphone=(),geolocation=()");
 app.addHook("preHandler",async(request,reply)=>{
  const origin=request.headers.origin;
  if(origin&&allowedOrigins.includes(origin)){reply.header("Access-Control-Allow-Origin",origin);reply.header("Vary","Origin");reply.header("Access-Control-Allow-Headers","Authorization,Content-Type");reply.header("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");}
  if(request.method==="OPTIONS")return reply.code(204).send();
  if(request.url==="/health"||request.url==="/ready")return;
  const pathname=request.url.split("?")[0]??"/";
- if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap"].includes(pathname))return;
+ if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap"].includes(pathname)){const key=pathname+":"+request.ip;if(!allowAuthAttempt(key,pathname.endsWith("login")?8:4,15*60*1000))return reply.code(429).send({error:"Too many authentication attempts. Try again later."});return;}
  const bearer=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
  let user:AuthUser|null=null;
  try{user=await authenticateSession(bearer)}catch(error){request.log.error(error);return reply.code(500).send({error:"Authentication service unavailable"})}
