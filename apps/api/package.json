@@ -14,7 +14,10 @@
   "dependencies": {
     "@aivedio/core": "workspace:*",
     "fastify": "^5.2.1",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "@langchain/core": "^1.5.0",
+    "@langchain/openai": "^1.8.5",
+    "langsmith": "^0.13.1"
   },
   "devDependencies": {
     "@types/pg": "^8.11.11",
