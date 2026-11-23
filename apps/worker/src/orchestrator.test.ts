@@ -11,9 +11,9 @@ test("task graph rejects duplicate ids, unknown dependencies and cycles",()=>{
 test("router does not silently substitute a provider",()=>{const route=routeGenerationJob(job);assert.equal(route.selected,"");assert.equal(route.confidence,0)});
 test("orchestrator routes role, honors dependency order and human gate",async()=>{
  const registry=new AgentRegistry(),order:string[]=[];
- for(const role of ["planner","auditor"] as const)registry.register({role,execute:async task=>{order.push(task.id);return{status:"completed",output:task.id,confidence:.95}}});
- const report=await orchestrateAgents(job,[{id:"plan",role:"planner",input:{}},{id:"audit",role:"auditor",dependencies:["plan"],input:{}}],registry);
- assert.equal(report.status,"completed");assert.deepEqual(order,["plan","audit"]);
+ for(const role of ["planner","auditor","supervisor"] as const)registry.register({role,execute:async task=>{order.push(task.id);return{status:"completed",output:task.id,confidence:.95}}});
+ const report=await orchestrateAgents(job,[{id:"plan",role:"planner",input:{}},{id:"audit",role:"auditor",dependencies:["plan"],input:{}},{id:"supervise",role:"supervisor",dependencies:["audit"],input:{}}],registry);
+ assert.equal(report.status,"completed");assert.deepEqual(order,["plan","audit","supervise"]);
  const gated=await orchestrateAgents(job,[{id:"review",role:"auditor",input:{},requiresHumanApproval:true}],registry);
  assert.equal(gated.status,"awaiting_human");
 });
