@@ -123,8 +123,8 @@ def fail(job,error):
  with db() as conn:
   with conn.cursor() as cur:
    state="queued" if job["attempt"]<job["max_attempts"] else "failed"
-   cur.execute("UPDATE asset_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '15 seconds',updated_at=now() WHERE id=%s",(state,str(error)[:2000],job["id"]))
-   cur.execute("UPDATE media_assets SET analysis_status=%s WHERE id=%s",(state,job["asset_id"]))
+   cur.execute("UPDATE asset_analysis_jobs SET status=%s,error=%s,lease_owner=NULL,lease_expires_at=NULL,available_at=now()+interval '15 seconds',updated_at=now() WHERE id=%s AND lease_owner=%s",(state,str(error)[:2000],job["id"],WORKER_ID))
+   if cur.rowcount==1:cur.execute("UPDATE media_assets SET analysis_status=%s WHERE id=%s",(state,job["asset_id"]))
 def main():
  print("AIVEDIO asset analysis worker started",WORKER_ID)
  while True:
