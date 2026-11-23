@@ -56,6 +56,9 @@ jobs:
       - name: Python syntax check
         run: |
           python -m compileall -q apps/streamlit apps/asset-worker apps/audio-worker apps/qa-worker
-      - name: Check Streamlit requirements
+      - name: Check Python worker requirements
         run: |
-          python -m pip install --dry-run -r apps/streamlit/requirements.txt\n          python -m pip install --dry-run -r apps/asset-worker/requirements.txt\n          python -m pip install --dry-run -r apps/audio-worker/requirements.txt\n          python -m pip install --dry-run -r apps/qa-worker/requirements.txt
+          python -m pip install --dry-run -r apps/streamlit/requirements.txt
+          python -m pip install --dry-run -r apps/asset-worker/requirements.txt
+          python -m pip install --dry-run -r apps/audio-worker/requirements.txt
+          python -m pip install --dry-run -r apps/qa-worker/requirements.txt
