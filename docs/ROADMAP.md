@@ -194,3 +194,23 @@
 - [ ] Project/resource ownership enforcement across every route
 - [ ] Reviewer identity derived from authenticated identity, not request payload
 - [ ] Secrets rotation and revocation strategy
+
+## Phase 21 — Authentication & Project RBAC (implementation in progress)
+- [x] User accounts with email normalization and unique index
+- [x] Scrypt password hashing (salted, parameterized)
+- [x] Opaque random session tokens stored as HMAC hashes; 14-day expiry and logout revocation
+- [x] One-time admin bootstrap protected by configured key and database advisory lock
+- [x] Self-registration opt-in (disabled by default)
+- [x] Project owner membership assigned on project creation
+- [x] Project listing filtered to memberships (admin can list all)
+- [x] Project membership roles: owner/editor/reviewer/viewer
+- [x] Owner-only member management endpoints
+- [x] Project route read/write/reviewer role checks
+- [x] Reviewer identity bound to authenticated account on review endpoints
+- [x] Global asset and generation-job listing scoped to memberships
+- [x] React Studio sign-in/sign-out and session bearer flow
+- [x] Streamlit sign-in/sign-out and session bearer flow
+- [ ] Complete resource ownership audit and authorization for all non-project-scoped endpoints
+- [ ] Login rate limiting, account recovery, email verification and session management UI
+- [ ] UI membership/invitation management
+- [ ] CI authentication and RBAC E2E test verification
