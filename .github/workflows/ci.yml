@@ -35,7 +35,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.9
+          version: 10.26.1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
