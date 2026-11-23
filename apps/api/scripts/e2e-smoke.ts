@@ -109,6 +109,13 @@ try{
  await request("POST",`/v1/projects/${project.id}/members`,{email:"reviewer@ci.aivedio.test",role:"reviewer"},201);
  const reviewerGet=await fetch(baseUrl+`/v1/projects/${project.id}`,{headers:{Authorization:"Bearer "+second.token}});
  assert.equal(reviewerGet.status,200,"Project reviewer can read project");
+ const forbiddenProviderRoute=await fetch(baseUrl+"/v1/providers/route",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({task:"video"})});
+ assert.equal(forbiddenProviderRoute.status,403,"Provider routing is admin-only");
+ const workerRun=await request("POST","/v1/workflows",{projectId:project.id,name:"CI worker guard",graph:{nodes:[]}},201);
+ const forbiddenTransition=await fetch(baseUrl+"/v1/workflows/"+workerRun.id+"/transition",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({status:"running"})});
+ assert.equal(forbiddenTransition.status,403,"Workflow state transitions are restricted to admins/trusted workers");
+ const forbiddenCheckpoint=await fetch(baseUrl+"/v1/workflows/"+workerRun.id+"/checkpoints",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({nodeId:"test",payload:{}})});
+ assert.equal(forbiddenCheckpoint.status,403,"Workflow checkpoints are restricted to admins/trusted workers");
  await db.query("INSERT INTO project_memory(project_id,kind,content,tags,importance) VALUES(NULL,'ci','private global accessaudit marker',ARRAY['ci'],0.9),($1,'ci','project scoped accessaudit marker',ARRAY['ci'],0.9)",[project.id]);
  const scopedMemory=await fetch(baseUrl+`/v1/memory/search?q=accessaudit&projectId=${project.id}`,{headers:{Authorization:"Bearer "+second.token}});
  assert.equal(scopedMemory.status,200);
