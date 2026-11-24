@@ -120,6 +120,10 @@ try{
  const forbiddenProviderRoute=await fetch(baseUrl+"/v1/providers/route",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({task:"video"})});
  assert.equal(forbiddenProviderRoute.status,403,"Provider routing is admin-only");
  const workerRun=await request("POST","/v1/workflows",{projectId:project.id,name:"CI worker guard",graph:{nodes:[]}},201);
+ const checkpointFixture=await request("POST",`/v1/workflows/${workerRun.id}/checkpoints`,{nodeId:"ci-read-test",payload:{visibility:"project-scoped"}},201);
+ const reviewerCheckpointRead=await fetch(baseUrl+`/v1/workflows/${workerRun.id}/checkpoints`,{headers:{Authorization:"Bearer "+second.token}});
+ assert.equal(reviewerCheckpointRead.status,200,"Project reviewer may read project-scoped workflow checkpoints");
+ assert.ok((await reviewerCheckpointRead.json()).some((checkpoint:any)=>checkpoint.id===checkpointFixture.id),"Project reviewer must see checkpoints belonging to their project");
  const forbiddenTransition=await fetch(baseUrl+"/v1/workflows/"+workerRun.id+"/transition",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({status:"running"})});
  assert.equal(forbiddenTransition.status,403,"Workflow state transitions are restricted to admins/trusted workers");
  const forbiddenCheckpoint=await fetch(baseUrl+"/v1/workflows/"+workerRun.id+"/checkpoints",{method:"POST",headers:{Authorization:"Bearer "+second.token,"Content-Type":"application/json"},body:JSON.stringify({nodeId:"test",payload:{}})});
