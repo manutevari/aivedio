@@ -1,4 +1,4 @@
-export type AgentRole="Improvisor"|"Implementation Agent"|"Patcher"|"Auditor";
+export type AgentRole="Researcher"|"Improvisor"|"Implementation Agent"|"Patcher"|"Auditor";
 export type JsonObject=Record<string,unknown>;
 const isObject=(v:unknown):v is JsonObject=>!!v&&typeof v==="object"&&!Array.isArray(v);
 const isString=(v:unknown):v is string=>typeof v==="string";
@@ -11,6 +11,11 @@ export function parseAgentJson(role:AgentRole,raw:string):JsonObject{
  let parsed:unknown;try{parsed=JSON.parse(text)}catch{fail(role,"invalid JSON")}
  if(!isObject(parsed))fail(role,"expected an object");
  const value=parsed as JsonObject;
+ if(role==="Researcher"){
+  if(!isString(value.summary)||!isArray(value.findings)||!isArray(value.gaps)||!isArray(value.recommendedQueries))fail(role,"expected summary, findings[], gaps[], recommendedQueries[]");
+  for(const finding of value.findings as unknown[]){if(!isObject(finding)||!isString(finding.claim)||!isString(finding.evidence)||!isArray(finding.sourceIds)||!["high","medium","low"].includes(String(finding.confidence))||(finding.sourceIds as unknown[]).some(id=>!isString(id)))fail(role,"invalid research finding")}
+  if((value.gaps as unknown[]).some(x=>!isString(x))||(value.recommendedQueries as unknown[]).some(x=>!isString(x)))fail(role,"gaps and recommendedQueries must contain strings");
+ }
  if(role==="Improvisor"){
   const ideas=value.ideas,assumptions=value.assumptions;
   if(!isArray(ideas)||!isString(value.recommendedDirection)||!isArray(assumptions))fail(role,"expected ideas[], recommendedDirection, assumptions[]");
