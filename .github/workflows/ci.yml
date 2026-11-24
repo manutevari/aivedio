@@ -37,6 +37,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Validate Vercel API pnpm configuration
+        run: node scripts/check-vercel-pnpm-config.mjs
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Typecheck
