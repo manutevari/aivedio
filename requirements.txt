@@ -1,0 +1,2 @@
+# Root-context deployment dependencies for the FastAPI Cloud adapter.
+-r apps/fastapi-adapter/requirements.txt
