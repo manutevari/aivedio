@@ -1,0 +1,73 @@
+name: AIVEDIO QA — Node 22 / pnpm lockfile diagnostic
+
+on:
+  push:
+    branches:
+      - qa/vercel-node22-pnpm-diagnostic
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dependency-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ''
+
+      - name: Pin Corepack package manager and report runtime
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          corepack --version
+          corepack enable
+          corepack prepare pnpm@10.26.1 --activate
+          pnpm --version
+
+      - name: Probe npm registry metadata
+        run: |
+          set -euo pipefail
+          npm view @types/react version
+          pnpm view @types/react version
+
+      - name: Install genuine workspace dependencies and generate lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Commit generated workspace lockfile on QA branch
+        run: |
+          set -euo pipefail
+          test -s pnpm-lock.yaml
+          git add pnpm-lock.yaml
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: commit generated pnpm workspace lockfile"
+            git push origin HEAD:qa/vercel-node22-pnpm-diagnostic
+          else
+            echo "pnpm-lock.yaml is already committed and unchanged"
+          fi
+
+      - name: Verify frozen lockfile install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck all workspaces
+        run: pnpm typecheck
+
+      - name: Build all workspaces
+        run: pnpm build
+
+      - name: API security and agent tests
+        run: |
+          pnpm --filter @aivedio/api test:security
+          pnpm --filter @aivedio/api test:agents
