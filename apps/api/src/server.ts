@@ -79,7 +79,7 @@ app.addHook("preHandler",async(request,reply)=>{
  if(request.body&&typeof request.body==="object"&&/(review|approve|safety-review)$/.test(pathname))(request.body as any).reviewer=user.email;
  if(user.global_role!=="admin"){
   if(pathname.startsWith("/v1/providers")||pathname.startsWith("/v1/intelligence/cache/"))return reply.code(403).send({error:"Admin role required"});
-  if((pathname.startsWith("/v1/generation-jobs/")&&pathname.endsWith("/transition"))||(pathname.startsWith("/v1/workflows/")&&(pathname.endsWith("/transition")||pathname.endsWith("/checkpoints"))))return reply.code(403).send({error:"Admin role required for worker operations"});
+  if((pathname.startsWith("/v1/generation-jobs/")&&pathname.endsWith("/transition"))||(pathname.startsWith("/v1/workflows/")&&(pathname.endsWith("/transition")||(pathname.endsWith("/checkpoints")&&request.method!=="GET"))))return reply.code(403).send({error:"Admin role required for worker operations"});
   if(pathname==="/v1/memory/search"&&!projectId)return reply.code(403).send({error:"Project scope required"});
   if(pathname.startsWith("/v1/workflows/")&&!projectId)return reply.code(403).send({error:"Project scope required"});
  }
