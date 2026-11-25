@@ -141,6 +141,8 @@ try{
  // Adversarial cross-project resource ownership tests.
  const projectB=await request("POST","/v1/projects",{title:"AIVEDIO CI isolation fixture B",mode:"flow",creativeBrief:"Isolation fixture"},201);
  const referenceB=await request("POST",`/v1/projects/${projectB.id}/flow/references`,{kind:"image",uri:"https://example.test/private-b.png",label:"Private B reference"},201);
+ const characterB=await request("POST",`/v1/projects/${projectB.id}/flow/characters`,{name:"Project B character",referenceIds:[referenceB.id]},201);
+ assert.deepEqual(characterB.reference_ids,[referenceB.id],"Character reference IDs must persist as JSONB");
  const crossCharacterReference=await fetch(baseUrl+`/v1/projects/${project.id}/flow/characters`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({name:"Cross-project reference attempt",referenceIds:[referenceB.id]})});
  assert.equal(crossCharacterReference.status,400,"Character creation must reject references owned by another project");
  const crossCharacterRows=await db.query("SELECT count(*)::int n FROM flow_characters WHERE project_id=$1 AND name=$2",[project.id,"Cross-project reference attempt"]);
