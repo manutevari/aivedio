@@ -34,7 +34,7 @@ export async function denoiseAudio(inputPath:string,outputPath:string,options:{n
  if(!inside(source)||!inside(target))throw new Error("Audio paths must stay inside MEDIA_WORK_DIR");
  const actualSource=await realpath(source);if(!inside(actualSource))throw new Error("Input audio symlink escapes MEDIA_WORK_DIR");
  const actualParent=await realpath(dirname(target));if(!inside(actualParent))throw new Error("Output directory escapes MEDIA_WORK_DIR");
- try{const existing=await lstat(target);if(existing.isSymbolicLink())throw new Error("Output path cannot be a symlink");throw new Error("Output file already exists; choose a new path")}catch(e){if(e instanceof Error&&e.message!=="ENOENT")throw e;}
+ try{const existing=await lstat(target);if(existing.isSymbolicLink())throw new Error("Output path cannot be a symlink");throw new Error("Output file already exists; choose a new path")}catch(e){if((e as NodeJS.ErrnoException).code!=="ENOENT")throw e;}
  const nf=Math.max(-80,Math.min(-10,options.noiseFloorDb??-25));
  const hp=Math.max(20,Math.min(1000,options.highpassHz??80));
  const lp=Math.max(2000,Math.min(20000,options.lowpassHz??12000));
