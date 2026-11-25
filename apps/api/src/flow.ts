@@ -1,5 +1,12 @@
 import {requireDb} from "./db.js";
-export async function createCharacter(projectId:string,input:{name:string;description?:string;consistencyNotes?:string;attributes?:Record<string,string>;referenceIds?:string[]}){return(await requireDb().query("INSERT INTO flow_characters(project_id,name,description,consistency_notes,attributes,reference_ids) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",[projectId,input.name,input.description??"",input.consistencyNotes??"",input.attributes??{},input.referenceIds??[]])).rows[0]}
+export async function createCharacter(projectId:string,input:{name:string;description?:string;consistencyNotes?:string;attributes?:Record<string,string>;referenceIds?:string[]}){
+ const referenceIds=[...new Set(input.referenceIds??[])];
+ if(referenceIds.length){
+  const found=await requireDb().query("SELECT id FROM flow_references WHERE project_id=$1 AND id=ANY($2::uuid[])",[projectId,referenceIds]);
+  if(found.rowCount!==referenceIds.length)throw new Error("Every character reference must belong to this project");
+ }
+ return(await requireDb().query("INSERT INTO flow_characters(project_id,name,description,consistency_notes,attributes,reference_ids) VALUES($1,$2,$3,$4,$5,$6::uuid[]) RETURNING *",[projectId,input.name,input.description??"",input.consistencyNotes??"",input.attributes??{},referenceIds])).rows[0]
+}
 export async function listCharacters(projectId:string){return(await requireDb().query("SELECT * FROM flow_characters WHERE project_id=$1 ORDER BY created_at",[projectId])).rows}
 export async function createReference(projectId:string,input:{kind:string;uri:string;label:string;tags?:string[];metadata?:unknown}){return(await requireDb().query("INSERT INTO flow_references(project_id,kind,uri,label,tags,metadata) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",[projectId,input.kind,input.uri,input.label,input.tags??[],input.metadata??{}])).rows[0]}
 export async function listReferences(projectId:string){return(await requireDb().query("SELECT * FROM flow_references WHERE project_id=$1 ORDER BY created_at DESC",[projectId])).rows}
