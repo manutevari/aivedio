@@ -47,7 +47,7 @@ export function createSarvamMediaHandler():MediaTaskHandler {
   switch(task.kind){
    case "text.translate":case "text.localize":return sarvamTranslate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"auto"),targetLanguageCode:String(input.targetLanguageCode??"hi-IN"),mode:input.mode==="classic-colloquial"||input.mode==="modern-colloquial"||input.mode==="code-mixed"?input.mode:"formal"});
    case "text.transliterate":return sarvamTransliterate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"hi-IN"),targetLanguageCode:String(input.targetLanguageCode??"en-IN")});
-   case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_enhi_ads"),model:typeof input.model==="string"?input.model:undefined,pace:typeof input.pace==="number"?input.pace:1});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
+   case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_enhi_ads"),...(typeof input.model==="string"?{model:input.model}:{}),pace:typeof input.pace==="number"?input.pace:1});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
    case "audio.denoise":await denoiseAudio(String(input.inputPath??""),String(input.outputPath??""));return {outputPath:String(input.outputPath)};
    default:throw new Error("Unsupported Sarvam worker task: "+task.kind);
   }
