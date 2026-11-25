@@ -8,12 +8,12 @@ async function requestJson(path:string,body:Record<string,unknown>,options:Sarva
  if(!response.ok){const detail=(await response.text()).slice(0,1000);throw new Error("Sarvam "+response.status+" "+path+": "+detail)}
  return response.json() as Promise<Record<string,unknown>>;
 }
-export async function sarvamTranslate(input:{text:string;sourceLanguageCode:string;targetLanguageCode:string;model?:string;mode?:"formal"|"colloquial"|"code-mixed"},options:SarvamOptions={}){
- if(!input.text.trim()||input.text.length>2000)throw new Error("Translation text must contain 1–2000 characters");
- return requestJson("/translate",{input:input.text,source_language_code:input.sourceLanguageCode,target_language_code:input.targetLanguageCode,model:input.model??"mayura:v1",mode:input.mode??"formal"},options);
+export async function sarvamTranslate(input:{text:string;sourceLanguageCode:string;targetLanguageCode:string;model?:string;mode?:"formal"|"classic-colloquial"|"modern-colloquial"|"code-mixed"},options:SarvamOptions={}){
+ const model=input.model??"mayura:v1";const limit=model==="mayura:v1"?1000:2000;if(!input.text.trim()||input.text.length>limit)throw new Error("Translation text must contain 1–"+limit+" characters for "+model);
+ return requestJson("/translate",{input:input.text,source_language_code:input.sourceLanguageCode,target_language_code:input.targetLanguageCode,model,mode:input.mode??"formal"},options);
 }
 export async function sarvamTransliterate(input:{text:string;sourceLanguageCode:string;targetLanguageCode:string},options:SarvamOptions={}){
- if(!input.text.trim()||input.text.length>2000)throw new Error("Transliteration text must contain 1–2000 characters");
+ if(!input.text.trim()||input.text.length>1000)throw new Error("Transliteration text must contain 1–1000 characters");
  return requestJson("/transliterate",{input:input.text,source_language_code:input.sourceLanguageCode,target_language_code:input.targetLanguageCode},options);
 }
 export async function sarvamSynthesize(input:{text:string;languageCode:string;speaker:string;model?:string;pace?:number;pitch?:number;loudness?:number;temperature?:number},options:SarvamOptions={}){
@@ -35,7 +35,7 @@ export function createSarvamMediaHandler():MediaTaskHandler {
   if(signal.aborted)throw new Error("Task aborted");
   const input=task.input as Record<string,any>;
   switch(task.kind){
-   case "text.translate":case "text.localize":return sarvamTranslate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"auto"),targetLanguageCode:String(input.targetLanguageCode??"hi-IN"),mode:input.mode==="colloquial"||input.mode==="code-mixed"?input.mode:"formal"});
+   case "text.translate":case "text.localize":return sarvamTranslate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"auto"),targetLanguageCode:String(input.targetLanguageCode??"hi-IN"),mode:input.mode==="classic-colloquial"||input.mode==="modern-colloquial"||input.mode==="code-mixed"?input.mode:"formal"});
    case "text.transliterate":return sarvamTransliterate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"hi-IN"),targetLanguageCode:String(input.targetLanguageCode??"en-IN")});
    case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_enhi_ads"),model:typeof input.model==="string"?input.model:undefined,pace:typeof input.pace==="number"?input.pace:1});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
    case "audio.denoise":await denoiseAudio(String(input.inputPath??""),String(input.outputPath??""));return {outputPath:String(input.outputPath)};
