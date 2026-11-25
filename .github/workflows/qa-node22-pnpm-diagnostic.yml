@@ -1,0 +1,53 @@
+name: AIVEDIO QA — Node 22 / pnpm registry diagnostic
+
+on:
+  push:
+    branches:
+      - qa/vercel-node22-pnpm-diagnostic
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ''
+
+      - name: Enable Corepack and report runtime
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          corepack --version
+          corepack enable
+          pnpm --version
+
+      - name: Probe npm registry metadata
+        run: |
+          set -euo pipefail
+          npm view @types/react version
+          pnpm view @types/react version
+
+      - name: Install genuine workspace dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck all workspaces
+        run: pnpm typecheck
+
+      - name: Build all workspaces
+        run: pnpm build
+
+      - name: API security and agent tests
+        run: |
+          pnpm --filter @aivedio/api test:security
+          pnpm --filter @aivedio/api test:agents
