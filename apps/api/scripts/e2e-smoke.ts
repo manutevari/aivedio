@@ -90,6 +90,12 @@ try{
   creativeBrief:"A short, original public-service advertisement showing a community taking practical steps to conserve water."
  },201);
  assert.ok(project.id,"Project creation must return an id");
+ const mediaTask=await request("POST",`/v1/projects/${project.id}/media-tasks`,{kind:"text.translate",mode:"async",input:{text:"Hello",sourceLanguageCode:"en-IN",targetLanguageCode:"hi-IN"}},202);
+ assert.ok(mediaTask.id,"Media task enqueue must return an id");
+ const cancelledMediaTask=await request("POST",`/v1/projects/${project.id}/media-tasks/${mediaTask.id}/cancel`,{},200);
+ assert.equal(cancelledMediaTask.status,"cancelled","Queued media task cancellation must persist");
+ const cancelledMediaTaskRead=await request("GET",`/v1/projects/${project.id}/media-tasks/${mediaTask.id}`,undefined,200);
+ assert.equal(cancelledMediaTaskRead.status,"cancelled","Cancelled media task state must be readable by project members");
  const ownerMembers=await request("GET",`/v1/projects/${project.id}/members`,undefined,200);
  assert.equal(ownerMembers.length,1,"New project must automatically assign owner membership");
 
