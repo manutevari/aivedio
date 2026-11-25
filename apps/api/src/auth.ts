@@ -60,7 +60,8 @@ export async function requestPasswordReset(emailInput:string){
  const link=baseUrl.origin+"/?resetToken="+encodeURIComponent(token);
  if(!user){await derive("dummy-reset-password","aivedio-reset-dummy-salt",64,{N,r:R,p:P,maxmem:128*1024*1024});return}
  const persist=await requireDb().connect();try{await persist.query("BEGIN");await persist.query("UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",[user.id]);await persist.query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,$3)",[user.id,digest,expires]);await persist.query("COMMIT")}catch(error){await persist.query("ROLLBACK");throw error}finally{persist.release()}
- await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+emailApi,"Content-Type":"application/json"},body:JSON.stringify({from,to:[user.email],subject:"Reset your AIVEDIO password",text:"Use this link within 30 minutes to reset your password: "+link+"\nIf you did not request this, ignore this email."}),signal:AbortSignal.timeout(15000)}).catch(()=>{});
+ const delivery=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+emailApi,"Content-Type":"application/json"},body:JSON.stringify({from,to:[user.email],subject:"Reset your AIVEDIO password",text:"Use this link within 30 minutes to reset your password: "+link+"\nIf you did not request this, ignore this email."}),signal:AbortSignal.timeout(15000)});
+ if(!delivery.ok){const detail=(await delivery.text()).slice(0,500);throw new Error("Password reset email delivery failed: "+delivery.status+" "+detail)}
 }
 export async function resetPassword(tokenInput:string,passwordInput:string){
  const token=String(tokenInput??"").trim();if(token.length<20||token.length>200)throw new Error("Invalid or expired reset token");

@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS media_task_jobs(
  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
  kind TEXT NOT NULL CHECK(kind IN ('speech.generate','text.translate','text.localize','text.transliterate','audio.denoise','script.critic','video.critic','quality.analyze')),
  execution_mode TEXT NOT NULL CHECK(execution_mode IN ('sync','async','stream')),
+ requires_approval BOOLEAN NOT NULL DEFAULT FALSE,
  input JSONB NOT NULL DEFAULT '{}',
  dependencies UUID[] NOT NULL DEFAULT '{}',
  status TEXT NOT NULL DEFAULT 'queued' CHECK(status IN ('pending','queued','running','retrying','completed','failed','cancelled','awaiting_review')),
@@ -16,7 +17,10 @@ CREATE TABLE IF NOT EXISTS media_task_jobs(
  created_by UUID,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
- completed_at TIMESTAMPTZ
+ completed_at TIMESTAMPTZ,
+ reviewed_by UUID,
+ reviewed_at TIMESTAMPTZ,
+ review_notes TEXT
 );
 CREATE INDEX IF NOT EXISTS media_task_jobs_claim_idx ON media_task_jobs(status,available_at,created_at);
 CREATE INDEX IF NOT EXISTS media_task_jobs_project_idx ON media_task_jobs(project_id,created_at DESC);

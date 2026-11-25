@@ -90,6 +90,18 @@ try{
   creativeBrief:"A short, original public-service advertisement showing a community taking practical steps to conserve water."
  },201);
  assert.ok(project.id,"Project creation must return an id");
+ const criticGateRun=(await db.query("INSERT INTO agent_pipeline_runs(project_id,input,audit,patch,status) VALUES($1,$2::jsonb,$3::jsonb,$4::jsonb,'awaiting_approval') RETURNING id",[project.id,{production:{scriptCritic:{verdict:"fail",findings:[]},videoCritic:{verdict:"pass",findings:[]},quality:{verdict:"pass",findings:[]}}},{verdict:"pass",score:99,findings:[]},{target:"projects.creative_brief",before:"before",after:"after"}])).rows[0].id;
+ const criticApproval=await fetch(baseUrl+`/v1/projects/${project.id}/agent-pipeline/runs/${criticGateRun}/decision`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",notes:"CI must block failed critic"})});
+ assert.equal(criticApproval.status,400,"A failed production critic must block human approval even when the Auditor passes");
+ assert.match((await criticApproval.json()).error,/auditor marked it unsafe for approval/i,"Critic approval rejection must come from the deterministic safety gate, not a database error");
+ const mediaTask=await request("POST",`/v1/projects/${project.id}/media-tasks`,{kind:"text.translate",mode:"async",input:{text:"Hello",sourceLanguageCode:"en-IN",targetLanguageCode:"hi-IN"}},202);
+ assert.ok(mediaTask.id,"Media task enqueue must return an id");
+ const cancelledMediaTask=await request("POST",`/v1/projects/${project.id}/media-tasks/${mediaTask.id}/cancel`,{},200);
+ assert.equal(cancelledMediaTask.status,"cancelled","Queued media task cancellation must persist");
+ const cancelledMediaTaskRead=await request("GET",`/v1/projects/${project.id}/media-tasks/${mediaTask.id}`,undefined,200);
+ assert.equal(cancelledMediaTaskRead.status,"cancelled","Cancelled media task state must be readable by project members");
+ await request("POST",`/v1/projects/${project.id}/media-tasks`,{kind:"text.translate",mode:"sync",input:{text:"Hello"}},400);
+ await request("POST",`/v1/projects/${project.id}/media-tasks`,{kind:"text.translate",mode:"stream",input:{text:"Hello"}},400);
  const ownerMembers=await request("GET",`/v1/projects/${project.id}/members`,undefined,200);
  assert.equal(ownerMembers.length,1,"New project must automatically assign owner membership");
 
@@ -134,6 +146,13 @@ try{
  assert.equal(boundReviewer.rows[0].reviewer,"reviewer@ci.aivedio.test","Reviewer identity must be derived from session, not request body");
  // Adversarial cross-project resource ownership tests.
  const projectB=await request("POST","/v1/projects",{title:"AIVEDIO CI isolation fixture B",mode:"flow",creativeBrief:"Isolation fixture"},201);
+ const referenceB=await request("POST",`/v1/projects/${projectB.id}/flow/references`,{kind:"image",uri:"https://example.test/private-b.png",label:"Private B reference"},201);
+ const characterB=await request("POST",`/v1/projects/${projectB.id}/flow/characters`,{name:"Project B character",referenceIds:[referenceB.id]},201);
+ assert.deepEqual(characterB.reference_ids,[referenceB.id],"Character reference IDs must persist as JSONB");
+ const crossCharacterReference=await fetch(baseUrl+`/v1/projects/${project.id}/flow/characters`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({name:"Cross-project reference attempt",referenceIds:[referenceB.id]})});
+ assert.equal(crossCharacterReference.status,400,"Character creation must reject references owned by another project");
+ const crossCharacterRows=await db.query("SELECT count(*)::int n FROM flow_characters WHERE project_id=$1 AND name=$2",[project.id,"Cross-project reference attempt"]);
+ assert.equal(crossCharacterRows.rows[0].n,0,"Rejected cross-project character references must not persist");
  const sceneB=(await db.query("INSERT INTO scenes(project_id,scene_order,title,prompt) VALUES($1,0,'Private B scene','B-only prompt') RETURNING id",[projectB.id])).rows[0].id;
  const subtitleB=(await db.query("INSERT INTO subtitle_cues(project_id,start_ms,end_ms,text) VALUES($1,0,1000,'Private B subtitle') RETURNING id",[projectB.id])).rows[0].id;
  const assetB=(await db.query("INSERT INTO media_assets(project_id,kind,status,storage_provider,storage_key,mime_type,size_bytes) VALUES($1,'video','quarantined','ci','private-b-asset','video/mp4',1) RETURNING id",[projectB.id])).rows[0].id;

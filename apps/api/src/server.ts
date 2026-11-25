@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import {loadApiSecurityConfig} from "./security-config.js";
-import {AuthRateLimiter} from "./auth-rate-limit.js";
+import {allowAuthAttempt} from "./auth-rate-limit.js";
 import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember,transferProjectOwnership} from "./auth.js";
 import type {AuthUser} from "./auth.js";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
@@ -26,14 +26,13 @@ import {createRenderJobFromTimeline} from "./rendering.js";
 import {reviewRenderJob} from "./timeline.js";
 import {runAgentPipeline,listAgentRuns,getAgentRun,decideAgentRun,applyApprovedBriefPatch} from "./agents.js";
 import {requestPasswordReset,resetPassword} from "./auth.js";
-import {enqueueMediaTask,getMediaTask,listMediaTasks} from "./media-tasks.js";
+import {enqueueMediaTask,getMediaTask,listMediaTasks,reviewMediaTask,cancelMediaTask} from "./media-tasks.js";
 
 
 
 const app=Fastify({logger:true});
 const securityConfig=loadApiSecurityConfig(process.env);
 const allowedOrigins=securityConfig.allowedOrigins;
-const authLimiter=new AuthRateLimiter(10000);
 app.addHook("onRequest",async(request,reply)=>{
  reply.header("X-Content-Type-Options","nosniff");
  reply.header("X-Frame-Options","DENY");
@@ -46,7 +45,7 @@ app.addHook("preHandler",async(request,reply)=>{
  if(request.method==="OPTIONS")return reply.code(204).send();
  if(request.url==="/health"||request.url==="/ready")return;
  const pathname=request.url.split("?")[0]??"/";
- if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap","/v1/auth/forgot-password","/v1/auth/reset-password"].includes(pathname)){const key=pathname+":"+request.ip;const limit=pathname.endsWith("login")?8:4;const decision=authLimiter.allow(key,limit,15*60*1000);if(!decision.allowed){reply.header("Retry-After",String(Math.ceil(decision.retryAfterMs/1000)));return reply.code(429).send({error:"Too many authentication attempts. Try again later."});}return;}
+ if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap","/v1/auth/forgot-password","/v1/auth/reset-password"].includes(pathname)){const key=pathname+":"+request.ip;const limit=pathname.endsWith("login")?8:4;try{const decision=await allowAuthAttempt(key,limit,15*60*1000);if(!decision.allowed){reply.header("Retry-After",String(Math.ceil(decision.retryAfterMs/1000)));return reply.code(429).send({error:"Too many authentication attempts. Try again later."});}}catch(error){request.log.error(error);return reply.code(503).send({error:"Authentication protection temporarily unavailable"});}return;}
  const bearer=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
  let user:AuthUser|null=null;
  try{user=await authenticateSession(bearer)}catch(error){request.log.error(error);return reply.code(500).send({error:"Authentication service unavailable"})}
@@ -79,7 +78,7 @@ app.addHook("preHandler",async(request,reply)=>{
  if(request.body&&typeof request.body==="object"&&/(review|approve|safety-review)$/.test(pathname))(request.body as any).reviewer=user.email;
  if(user.global_role!=="admin"){
   if(pathname.startsWith("/v1/providers")||pathname.startsWith("/v1/intelligence/cache/"))return reply.code(403).send({error:"Admin role required"});
-  if((pathname.startsWith("/v1/generation-jobs/")&&pathname.endsWith("/transition"))||(pathname.startsWith("/v1/workflows/")&&(pathname.endsWith("/transition")||pathname.endsWith("/checkpoints"))))return reply.code(403).send({error:"Admin role required for worker operations"});
+  if((pathname.startsWith("/v1/generation-jobs/")&&pathname.endsWith("/transition"))||(pathname.startsWith("/v1/workflows/")&&(pathname.endsWith("/transition")||(pathname.endsWith("/checkpoints")&&request.method!=="GET"))))return reply.code(403).send({error:"Admin role required for worker operations"});
   if(pathname==="/v1/memory/search"&&!projectId)return reply.code(403).send({error:"Project scope required"});
   if(pathname.startsWith("/v1/workflows/")&&!projectId)return reply.code(403).send({error:"Project scope required"});
  }
@@ -174,10 +173,12 @@ app.post("/v1/projects/:id/transfer-owner",async(request,reply)=>{try{const user
 app.post("/v1/projects/:id/media-tasks",async(request,reply)=>{try{const p=request.params as any;const user=(request as any).user as AuthUser;const b=request.body as any;if(!b||typeof b.kind!=="string"||!b.input||typeof b.input!=="object")return reply.code(400).send({error:"kind and input are required"});return reply.code(202).send(await enqueueMediaTask(p.id,user.id,b))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/media-tasks",async(request)=>listMediaTasks((request.params as any).id));
 app.get("/v1/projects/:id/media-tasks/:taskId",async(request,reply)=>{const p=request.params as any;const result=await getMediaTask(p.id,p.taskId);if(!result)return reply.code(404).send({error:"Media task not found"});return result});
+app.post("/v1/projects/:id/media-tasks/:taskId/cancel",async(request,reply)=>{const p=request.params as any;const result=await cancelMediaTask(p.id,p.taskId);if(!result)return reply.code(409).send({error:"Media task cannot be cancelled in its current state"});return result});
+app.post("/v1/projects/:id/media-tasks/:taskId/review",async(request,reply)=>{const p=request.params as any;const b=request.body as any;const user=(request as any).user as AuthUser;if(!["approve","reject"].includes(b?.decision))return reply.code(400).send({error:"Decision must be approve or reject"});const result=await reviewMediaTask(p.id,p.taskId,user.id,b.decision,b.notes);if(!result)return reply.code(409).send({error:"Media task is not awaiting review"});return result});
 app.post("/v1/projects/:id/agent-pipeline/runs",async(request,reply)=>{try{const p=request.params as any;const user=(request as any).user as AuthUser;return reply.status(201).send(await runAgentPipeline(p.id,user.id,request.body as any??{}))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/agent-pipeline/runs",async(request)=>listAgentRuns((request.params as any).id));
 app.get("/v1/projects/:id/agent-pipeline/runs/:runId",async(request,reply)=>{const p=request.params as any;const row=await getAgentRun(p.id,p.runId);if(!row)return reply.code(404).send({error:"Agent run not found"});return row});
-app.post("/v1/projects/:id/agent-pipeline/runs/:runId/decision",async(request,reply)=>{try{const p=request.params as any,b=request.body as any,user=(request as any).user as AuthUser;if(!["approve","reject"].includes(b?.decision))return reply.code(400).send({error:"Decision must be approve or reject"});return decideAgentRun(p.id,p.runId,user.id,b.decision,b.notes)}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/agent-pipeline/runs/:runId/decision",async(request,reply)=>{try{const p=request.params as any,b=request.body as any,user=(request as any).user as AuthUser;if(!["approve","reject"].includes(b?.decision))return reply.code(400).send({error:"Decision must be approve or reject"});return await decideAgentRun(p.id,p.runId,user.id,b.decision,b.notes)}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.post("/v1/projects/:id/agent-pipeline/runs/:runId/apply",async(request,reply)=>{try{const p=request.params as any,user=(request as any).user as AuthUser;return await applyApprovedBriefPatch(p.id,p.runId,user.id)}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/role",async(request,reply)=>{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(!role)return reply.code(404).send({error:"Project not found"});return{role}});
 app.get("/v1/projects/:id/members",async(request,reply)=>{const id=(request.params as any).id;const user=(request as any).user as AuthUser;const role=await getProjectRole(user,id);if(!role)return reply.code(404).send({error:"Project not found"});if(role!=="owner"&&user.global_role!=="admin")return reply.code(403).send({error:"Owner role required"});return listProjectMembers(id)});
@@ -192,7 +193,7 @@ app.post("/v1/projects/:id/scenes",async(request,reply)=>{const {id}=request.par
 app.patch("/v1/scenes/:id",async(request,reply)=>{const s=await updateScene((request.params as {id:string}).id,request.body as Record<string,unknown>);if(!s)return reply.status(404).send({error:"Scene not found"});return s;});
 app.delete("/v1/scenes/:id",async(request,reply)=>{if(!await deleteScene((request.params as {id:string}).id))return reply.status(404).send({error:"Scene not found"});return {deleted:true};});
 app.get("/v1/projects/:id/flow/characters",async(request)=>listCharacters((request.params as {id:string}).id));
-app.post("/v1/projects/:id/flow/characters",async(request,reply)=>{const id=(request.params as {id:string}).id;if(!await getProject(id))return reply.status(404).send({error:"Project not found"});const body=request.body as {name:string;description?:string;consistencyNotes?:string;attributes?:Record<string,string>;referenceIds?:string[]};if(!body?.name?.trim())return reply.status(400).send({error:"name required"});return reply.status(201).send(await createCharacter(id,body));});
+app.post("/v1/projects/:id/flow/characters",async(request,reply)=>{try{const id=(request.params as {id:string}).id;if(!await getProject(id))return reply.status(404).send({error:"Project not found"});const body=request.body as {name:string;description?:string;consistencyNotes?:string;attributes?:Record<string,string>;referenceIds?:string[]};if(!body?.name?.trim())return reply.status(400).send({error:"name required"});return reply.status(201).send(await createCharacter(id,body))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/flow/references",async(request)=>listReferences((request.params as {id:string}).id));
 app.post("/v1/projects/:id/flow/references",async(request,reply)=>{const id=(request.params as {id:string}).id;if(!await getProject(id))return reply.status(404).send({error:"Project not found"});const body=request.body as {kind:string;uri:string;label:string;tags?:string[];metadata?:unknown};if(!body?.uri||!body?.label)return reply.status(400).send({error:"uri and label required"});return reply.status(201).send(await createReference(id,body));});
 app.post("/v1/projects/:id/flow/scenes/reorder",async(request,reply)=>{const id=(request.params as {id:string}).id;const body=request.body as {scenes:any[]};if(!Array.isArray(body?.scenes))return reply.status(400).send({error:"scenes array required"});try{return reply.send(await replaceFlowScenes(id,body.scenes))}catch(e){const message=e instanceof Error?e.message:String(e);return reply.status(message==="Scene not found in project"?404:400).send({error:message})}});

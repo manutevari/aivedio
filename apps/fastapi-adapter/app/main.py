@@ -26,8 +26,14 @@ async def ready() -> Response:
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             upstream = await client.get(f"{UPSTREAM}/ready")
-        if upstream.status_code >= 500:
+        if upstream.status_code != 200:
             return JSONResponse(status_code=503, content={"ready": False, "upstream_status": upstream.status_code})
+        try:
+            payload = upstream.json()
+        except ValueError:
+            return JSONResponse(status_code=503, content={"ready": False, "reason": "upstream readiness response is not JSON"})
+        if not isinstance(payload, dict) or payload.get("ready") is not True:
+            return JSONResponse(status_code=503, content={"ready": False, "reason": "upstream did not confirm readiness", "upstream_status": upstream.status_code})
         return JSONResponse(status_code=200, content={"ready": True, "upstream_status": upstream.status_code})
     except httpx.HTTPError:
         return JSONResponse(status_code=503, content={"ready": False, "reason": "upstream unavailable"})
