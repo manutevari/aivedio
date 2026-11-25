@@ -140,6 +140,11 @@ try{
  assert.equal(boundReviewer.rows[0].reviewer,"reviewer@ci.aivedio.test","Reviewer identity must be derived from session, not request body");
  // Adversarial cross-project resource ownership tests.
  const projectB=await request("POST","/v1/projects",{title:"AIVEDIO CI isolation fixture B",mode:"flow",creativeBrief:"Isolation fixture"},201);
+ const referenceB=await request("POST",`/v1/projects/${projectB.id}/flow/references`,{kind:"image",uri:"https://example.test/private-b.png",label:"Private B reference"},201);
+ const crossCharacterReference=await fetch(baseUrl+`/v1/projects/${project.id}/flow/characters`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({name:"Cross-project reference attempt",referenceIds:[referenceB.id]})});
+ assert.equal(crossCharacterReference.status,400,"Character creation must reject references owned by another project");
+ const crossCharacterRows=await db.query("SELECT count(*)::int n FROM flow_characters WHERE project_id=$1 AND name=$2",[project.id,"Cross-project reference attempt"]);
+ assert.equal(crossCharacterRows.rows[0].n,0,"Rejected cross-project character references must not persist");
  const sceneB=(await db.query("INSERT INTO scenes(project_id,scene_order,title,prompt) VALUES($1,0,'Private B scene','B-only prompt') RETURNING id",[projectB.id])).rows[0].id;
  const subtitleB=(await db.query("INSERT INTO subtitle_cues(project_id,start_ms,end_ms,text) VALUES($1,0,1000,'Private B subtitle') RETURNING id",[projectB.id])).rows[0].id;
  const assetB=(await db.query("INSERT INTO media_assets(project_id,kind,status,storage_provider,storage_key,mime_type,size_bytes) VALUES($1,'video','quarantined','ci','private-b-asset','video/mp4',1) RETURNING id",[projectB.id])).rows[0].id;
