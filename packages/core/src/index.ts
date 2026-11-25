@@ -22,3 +22,5 @@ export * from './production-editing.js';
 export * from './audio-intelligence.js';
 
 export * from "./rendering.js";
+
+export * from "./media-workflow.js";
