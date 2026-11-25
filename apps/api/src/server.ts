@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import {loadApiSecurityConfig} from "./security-config.js";
-import {AuthRateLimiter} from "./auth-rate-limit.js";
+import {allowAuthAttempt} from "./auth-rate-limit.js";
 import {bootstrapAdmin,registerUser,loginUser,authenticateSession,revokeSession,getProjectRole,addProjectMember,listProjectMembers,removeProjectMember,transferProjectOwnership} from "./auth.js";
 import type {AuthUser} from "./auth.js";
 import {requestAssetAnalysis,listAssetAnalysis,getAssetAnalysis,getAssetIntelligence,searchMediaChunks,listKeyframes} from './asset-intelligence.js';
@@ -33,7 +33,6 @@ import {enqueueMediaTask,getMediaTask,listMediaTasks,reviewMediaTask,cancelMedia
 const app=Fastify({logger:true});
 const securityConfig=loadApiSecurityConfig(process.env);
 const allowedOrigins=securityConfig.allowedOrigins;
-const authLimiter=new AuthRateLimiter(10000);
 app.addHook("onRequest",async(request,reply)=>{
  reply.header("X-Content-Type-Options","nosniff");
  reply.header("X-Frame-Options","DENY");
@@ -46,7 +45,7 @@ app.addHook("preHandler",async(request,reply)=>{
  if(request.method==="OPTIONS")return reply.code(204).send();
  if(request.url==="/health"||request.url==="/ready")return;
  const pathname=request.url.split("?")[0]??"/";
- if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap","/v1/auth/forgot-password","/v1/auth/reset-password"].includes(pathname)){const key=pathname+":"+request.ip;const limit=pathname.endsWith("login")?8:4;const decision=authLimiter.allow(key,limit,15*60*1000);if(!decision.allowed){reply.header("Retry-After",String(Math.ceil(decision.retryAfterMs/1000)));return reply.code(429).send({error:"Too many authentication attempts. Try again later."});}return;}
+ if(["/v1/auth/login","/v1/auth/register","/v1/auth/bootstrap","/v1/auth/forgot-password","/v1/auth/reset-password"].includes(pathname)){const key=pathname+":"+request.ip;const limit=pathname.endsWith("login")?8:4;try{const decision=await allowAuthAttempt(key,limit,15*60*1000);if(!decision.allowed){reply.header("Retry-After",String(Math.ceil(decision.retryAfterMs/1000)));return reply.code(429).send({error:"Too many authentication attempts. Try again later."});}}catch(error){request.log.error(error);return reply.code(503).send({error:"Authentication protection temporarily unavailable"});}return;}
  const bearer=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
  let user:AuthUser|null=null;
  try{user=await authenticateSession(bearer)}catch(error){request.log.error(error);return reply.code(500).send({error:"Authentication service unavailable"})}
