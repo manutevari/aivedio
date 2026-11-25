@@ -2,11 +2,11 @@ import {spawn} from "node:child_process";
 import {realpath,lstat} from "node:fs/promises";
 import {resolve,relative,dirname,isAbsolute} from "node:path";
 import type {MediaTaskContract,MediaTaskHandler} from "@aivedio/core";
-type SarvamOptions={apiKey?:string;baseUrl?:string;timeoutMs?:number};
+type SarvamOptions={apiKey?:string;baseUrl?:string;timeoutMs?:number;signal?:AbortSignal};
 const API="https://api.sarvam.ai";
 function requireKey(options:SarvamOptions){const key=options.apiKey??process.env.SARVAM_API_KEY;if(!key)throw new Error("SARVAM_API_KEY is not configured on the worker");return key}
 async function requestJson(path:string,body:Record<string,unknown>,options:SarvamOptions={}){
- const response=await fetch((options.baseUrl??API)+path,{method:"POST",headers:{"api-subscription-key":requireKey(options),"content-type":"application/json"},body:JSON.stringify(body),signal:AbortSignal.timeout(options.timeoutMs??60000)});
+ const response=await fetch((options.baseUrl??API)+path,{method:"POST",headers:{"api-subscription-key":requireKey(options),"content-type":"application/json"},body:JSON.stringify(body),signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(options.timeoutMs??60000)]):AbortSignal.timeout(options.timeoutMs??60000)});
  if(!response.ok){const detail=(await response.text()).slice(0,1000);throw new Error("Sarvam "+response.status+" "+path+": "+detail)}
  return response.json() as Promise<Record<string,unknown>>;
 }
@@ -45,9 +45,9 @@ export function createSarvamMediaHandler():MediaTaskHandler {
   if(signal.aborted)throw new Error("Task aborted");
   const input=task.input as Record<string,any>;
   switch(task.kind){
-   case "text.translate":case "text.localize":return sarvamTranslate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"auto"),targetLanguageCode:String(input.targetLanguageCode??"hi-IN"),mode:input.mode==="classic-colloquial"||input.mode==="modern-colloquial"||input.mode==="code-mixed"?input.mode:"formal"});
-   case "text.transliterate":return sarvamTransliterate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"hi-IN"),targetLanguageCode:String(input.targetLanguageCode??"en-IN")});
-   case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_enhi_ads"),...(typeof input.model==="string"?{model:input.model}:{}),pace:typeof input.pace==="number"?input.pace:1});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
+   case "text.translate":case "text.localize":return sarvamTranslate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"auto"),targetLanguageCode:String(input.targetLanguageCode??"hi-IN"),mode:input.mode==="classic-colloquial"||input.mode==="modern-colloquial"||input.mode==="code-mixed"?input.mode:"formal"},{signal});
+   case "text.transliterate":return sarvamTransliterate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"hi-IN"),targetLanguageCode:String(input.targetLanguageCode??"en-IN")},{signal});
+   case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_enhi_ads"),...(typeof input.model==="string"?{model:input.model}:{}),pace:typeof input.pace==="number"?input.pace:1},{signal});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
    case "audio.denoise":await denoiseAudio(String(input.inputPath??""),String(input.outputPath??""),{signal});return {outputPath:String(input.outputPath)};
    default:throw new Error("Unsupported Sarvam worker task: "+task.kind);
   }
