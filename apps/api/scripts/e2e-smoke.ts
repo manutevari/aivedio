@@ -96,6 +96,8 @@ try{
  assert.equal(cancelledMediaTask.status,"cancelled","Queued media task cancellation must persist");
  const cancelledMediaTaskRead=await request("GET",`/v1/projects/${project.id}/media-tasks/${mediaTask.id}`,undefined,200);
  assert.equal(cancelledMediaTaskRead.status,"cancelled","Cancelled media task state must be readable by project members");
+ await request("POST",`/v1/projects/${project.id}/media-tasks`,{kind:"text.translate",mode:"sync",input:{text:"Hello"}},400);
+ await request("POST",`/v1/projects/${project.id}/media-tasks`,{kind:"text.translate",mode:"stream",input:{text:"Hello"}},400);
  const ownerMembers=await request("GET",`/v1/projects/${project.id}/members`,undefined,200);
  assert.equal(ownerMembers.length,1,"New project must automatically assign owner membership");
 
