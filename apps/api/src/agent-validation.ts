@@ -1,4 +1,4 @@
-export type AgentRole="Researcher"|"Script Agent"|"Narrator Agent"|"Voice Modulator Agent"|"Improvisor"|"Implementation Agent"|"Patcher"|"Auditor";
+export type AgentRole="Researcher"|"Script Agent"|"Narrator Agent"|"Voice Modulator Agent"|"Speech Generator Agent"|"Translation Agent"|"Localization Agent"|"Transliteration Agent"|"Script Critic Agent"|"Video Critic Agent"|"Quality Analyzer Agent"|"Improvisor"|"Implementation Agent"|"Patcher"|"Auditor";
 export type JsonObject=Record<string,unknown>;
 const isObject=(v:unknown):v is JsonObject=>!!v&&typeof v==="object"&&!Array.isArray(v);
 const isString=(v:unknown):v is string=>typeof v==="string";
@@ -30,6 +30,20 @@ export function parseAgentJson(role:AgentRole,raw:string):JsonObject{
   if(value.provider!=="neutral"||!isArray(value.voiceProfiles)||!isArray(value.mixNotes))fail(role,"expected provider neutral, voiceProfiles[], mixNotes[]");
   for(const profile of value.voiceProfiles as unknown[]){if(!isObject(profile)||!isString(profile.speaker)||!isString(profile.voiceStyle)||!isString(profile.pitch)||!isString(profile.speed)||!isString(profile.tone)||!isString(profile.emotion)||!isString(profile.pronunciationNotes))fail(role,"invalid voice profile")}
   if((value.mixNotes as unknown[]).some(x=>!isString(x)))fail(role,"mixNotes must contain strings");
+ }
+
+ if(role==="Speech Generator Agent"){
+  if(value.provider!=="sarvam"||!isArray(value.segments)||!isString(value.outputFormat))fail(role,"expected provider sarvam, segments[], outputFormat");
+  for(const s of value.segments as unknown[]){if(!isObject(s)||!isString(s.text)||!isString(s.languageCode)||!isString(s.speaker)||!Number.isInteger(s.sceneNumber))fail(role,"invalid speech segment")}
+ }
+ if(role==="Translation Agent"||role==="Localization Agent"||role==="Transliteration Agent"){
+  if(!isString(value.sourceLanguage)||!isString(value.targetLanguage)||!isArray(value.segments))fail(role,"expected sourceLanguage, targetLanguage and segments[]");
+  for(const s of value.segments as unknown[]){if(!isObject(s)||!isString(s.source)||!isString(s.output)||!Number.isInteger(s.segmentId))fail(role,"invalid language segment")}
+ }
+ if(role==="Script Critic Agent"||role==="Video Critic Agent"||role==="Quality Analyzer Agent"){
+  if(!["pass","needs_changes","fail"].includes(String(value.verdict))||!Number.isInteger(value.score)||Number(value.score)<0||Number(value.score)>100||!isArray(value.findings)||!isArray(value.recommendations))fail(role,"expected verdict, score, findings[], recommendations[]");
+  for(const f of value.findings as unknown[]){if(!isObject(f)||!["critical","high","medium","low","info"].includes(String(f.severity))||!isString(f.issue)||!isString(f.evidence)||!isString(f.recommendation))fail(role,"invalid critic finding")}
+  if((value.recommendations as unknown[]).some(x=>!isString(x)))fail(role,"recommendations must contain strings");
  }
  if(role==="Improvisor"){
   const ideas=value.ideas,assumptions=value.assumptions;
