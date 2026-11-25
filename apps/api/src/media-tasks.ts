@@ -18,3 +18,8 @@ export async function reviewMediaTask(projectId:string,id:string,userId:string,d
  const r=await requireDb().query("UPDATE media_task_jobs SET status=$3,reviewed_by=$4,reviewed_at=now(),review_notes=$5,error=CASE WHEN $3='failed' THEN COALESCE($5,'Rejected during human review') ELSE NULL END,completed_at=now(),updated_at=now() WHERE project_id=$1 AND id=$2 AND status='awaiting_review' RETURNING id,project_id,status,reviewed_by,reviewed_at,review_notes",[projectId,id,status,userId,notes??null]);
  return r.rows[0]??null;
 }
+
+export async function cancelMediaTask(projectId:string,id:string,userId:string){
+ const r=await requireDb().query("UPDATE media_task_jobs SET status='cancelled',lease_owner=NULL,lease_expires_at=NULL,error='Cancelled by project member',updated_at=now(),completed_at=now() WHERE project_id=$1 AND id=$2 AND status IN ('queued','retrying','running') RETURNING id,project_id,status,updated_at,completed_at",[projectId,id]);
+ return r.rows[0]??null;
+}
