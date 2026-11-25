@@ -444,3 +444,25 @@ P2 rate limits, DB hardening, CSP, scanning, load tests, SLOs
 AIVEDIO is not production-ready until Vercel install is deterministic and preview succeeds with pinned package manager; main CI is green with committed lockfile and frozen install; API readiness/auth/project authorization pass staging; at least one real generation provider works end-to-end; worker queue/render/retry works in container runtime; upload/private storage/authorized download pass; safety classification and human review pass including uncertain cases; backup restore/observability/alerts/rollback are exercised; and production release receives explicit approval.
 
 **This SOP does not claim P1/P2 items are already fixed and does not authorize production deployment.**
+
+## 15. Follow-up evidence — Vercel project-level override (2026-11-26)
+
+A controlled preview was created for commit `b31af25910dc38d65b1b8de7a24dd1f17051a989`. Its build log still printed:
+
+```text
+Running "install" command: `pnpm install --no-frozen-lockfile`
+WARN GET https://registry.npmjs.org/... error (ERR_INVALID_THIS)
+```
+
+This is direct evidence that the repository-level `vercel.json` edit alone did not control the effective install command for that deployment. The build was created before the Vercel project settings were corrected.
+
+**Additional controlled project configuration applied:**
+- Web project `aivedio`: project-level install command set to `corepack pnpm install --no-frozen-lockfile`; Node remains 22.x; Vercel affected-project deployment skipping enabled.
+- API project `aivedio-api`: same project-level install command and Node 22.x; affected-project deployment skipping enabled.
+- No worker project settings, production secrets, domains, SSO protection or production aliases were changed.
+
+A fresh preview deployment was then explicitly requested for the web project and API project from the same branch/commit, with the Corepack install command included in deployment settings. At the time of this update, both deployments were in Vercel `QUEUED` state and had not emitted build logs. They are **not yet validated**. Do not mark this remediation successful until logs show Corepack/pnpm 10.26.1 and the builds complete.
+
+The branch still has no root `pnpm-lock.yaml`. This was deliberately not fabricated. Frozen installs remain a follow-up after generating a genuine lockfile from the actual workspace.
+
+**Operational caution:** the earlier Git-linked event created builds for other worker projects as well. Affected-project skipping was enabled only on web/API. Verify the monorepo dependency graph and each worker project's root directory before further deployment optimization. Do not disable worker deployments or alter their roots without checking their actual entrypoints.
