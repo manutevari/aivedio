@@ -18,7 +18,7 @@ export async function sarvamTransliterate(input:{text:string;sourceLanguageCode:
 }
 export async function sarvamSynthesize(input:{text:string;languageCode:string;speaker:string;model?:string;pace?:number;pitch?:number;loudness?:number;temperature?:number},options:SarvamOptions={}){
  if(!input.text.trim()||input.text.length>2500)throw new Error("TTS text must contain 1–2500 characters per request");
- const body=await requestJson("/text-to-speech",{text:input.text,language_code:input.languageCode,speaker:input.speaker,model:input.model??"bulbul:v4-flash",pace:input.pace??1.0,pitch:input.pitch??0,loudness:input.loudness??1.0,temperature:input.temperature??0.6},options);
+ const body=await requestJson("/text-to-speech",{text:input.text,language_code:input.languageCode,speaker:input.speaker,model:input.model??"bulbul:v4-flash",pace:input.pace??1.0,pitch:input.pitch??0,loudness:input.loudness??1.0,temperature:input.temperature??0.6,output_audio_codec:"mp3"},options);
  const audios=body.audios;if(!Array.isArray(audios)||typeof audios[0]!=="string")throw new Error("Sarvam TTS response did not contain base64 audio");
  return {audio:Buffer.from(audios[0],"base64"),requestId:String(body.request_id??""),model:input.model??"bulbul:v4-flash"};
 }
@@ -37,7 +37,7 @@ export function createSarvamMediaHandler():MediaTaskHandler {
   switch(task.kind){
    case "text.translate":case "text.localize":return sarvamTranslate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"auto"),targetLanguageCode:String(input.targetLanguageCode??"hi-IN"),mode:input.mode==="colloquial"||input.mode==="code-mixed"?input.mode:"formal"});
    case "text.transliterate":return sarvamTransliterate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"hi-IN"),targetLanguageCode:String(input.targetLanguageCode??"en-IN")});
-   case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_hi_female"),model:typeof input.model==="string"?input.model:undefined,pace:typeof input.pace==="number"?input.pace:1});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
+   case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_enhi_ads"),model:typeof input.model==="string"?input.model:undefined,pace:typeof input.pace==="number"?input.pace:1});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
    case "audio.denoise":await denoiseAudio(String(input.inputPath??""),String(input.outputPath??""));return {outputPath:String(input.outputPath)};
    default:throw new Error("Unsupported Sarvam worker task: "+task.kind);
   }
