@@ -220,4 +220,5 @@ app.get('/v1/projects/:id/assets/:assetId/intelligence',async(request,reply)=>{t
 app.get('/v1/projects/:id/assets/:assetId/keyframes',async(request)=>listKeyframes((request.params as {id:string;assetId:string}).id,(request.params as {assetId:string}).assetId));
 app.get('/v1/projects/:id/media-search',async(request)=>{const q=request.query as {q?:string;limit?:string};return searchMediaChunks((request.params as {id:string}).id,q.q??'',Number(q.limit)||10)});
 export {app};
+export default app;
 if(!process.env.VERCEL){const port=Number(process.env.PORT??3000);await app.listen({port,host:"0.0.0.0"});}
