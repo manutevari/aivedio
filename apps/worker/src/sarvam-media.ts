@@ -25,7 +25,7 @@ export async function sarvamSynthesize(input:{text:string;languageCode:string;sp
  return {audio:Buffer.from(audios[0],"base64"),requestId:String(body.request_id??""),model:input.model??"bulbul:v4-flash"};
 }
 /** Apply non-destructive FFmpeg denoising into a separate output file; never overwrite the source. */
-export async function denoiseAudio(inputPath:string,outputPath:string,options:{noiseFloorDb?:number;highpassHz?:number;lowpassHz?:number}={}):Promise<void>{
+export async function denoiseAudio(inputPath:string,outputPath:string,options:{noiseFloorDb?:number;highpassHz?:number;lowpassHz?:number;signal?:AbortSignal}={}):Promise<void>{
  if(inputPath===outputPath)throw new Error("Noise cancellation must write to a new output path");
  const root=process.env.MEDIA_WORK_DIR;if(!root)throw new Error("MEDIA_WORK_DIR must be configured for audio denoising");
  const workRoot=await realpath(root);
@@ -38,7 +38,7 @@ export async function denoiseAudio(inputPath:string,outputPath:string,options:{n
  const nf=Math.max(-80,Math.min(-10,options.noiseFloorDb??-25));
  const hp=Math.max(20,Math.min(1000,options.highpassHz??80));
  const lp=Math.max(2000,Math.min(20000,options.lowpassHz??12000));
- await new Promise<void>((resolve,reject)=>{const p=spawn("ffmpeg",["-nostdin","-n","-i",source,"-af",`highpass=f=${hp},lowpass=f=${lp},afftdn=nf=${nf}:tn=1:tr=1`,"-c:a","libmp3lame","-q:a","2",target],{stdio:["ignore","ignore","pipe"]});let err="";p.stderr.on("data",d=>{err=(err+String(d)).slice(-4000)});p.on("error",reject);p.on("close",code=>code===0?resolve():reject(new Error("FFmpeg denoise failed ("+code+"): "+err)))});
+ await new Promise<void>((resolve,reject)=>{const p=spawn("ffmpeg",["-nostdin","-n","-i",source,"-af",`highpass=f=${hp},lowpass=f=${lp},afftdn=nf=${nf}:tn=1:tr=1`,"-c:a","libmp3lame","-q:a","2",target],{stdio:["ignore","ignore","pipe"],signal:options.signal});let err="";p.stderr.on("data",d=>{err=(err+String(d)).slice(-4000)});p.on("error",reject);p.on("close",code=>code===0?resolve():reject(new Error("FFmpeg denoise failed ("+code+"): "+err)))});
 }
 export function createSarvamMediaHandler():MediaTaskHandler {
  return {async execute(task:MediaTaskContract,signal:AbortSignal){
@@ -48,7 +48,7 @@ export function createSarvamMediaHandler():MediaTaskHandler {
    case "text.translate":case "text.localize":return sarvamTranslate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"auto"),targetLanguageCode:String(input.targetLanguageCode??"hi-IN"),mode:input.mode==="classic-colloquial"||input.mode==="modern-colloquial"||input.mode==="code-mixed"?input.mode:"formal"});
    case "text.transliterate":return sarvamTransliterate({text:String(input.text??""),sourceLanguageCode:String(input.sourceLanguageCode??"hi-IN"),targetLanguageCode:String(input.targetLanguageCode??"en-IN")});
    case "speech.generate":{const result=await sarvamSynthesize({text:String(input.text??""),languageCode:String(input.languageCode??"hi-IN"),speaker:String(input.speaker??"shubh_enhi_ads"),...(typeof input.model==="string"?{model:input.model}:{}),pace:typeof input.pace==="number"?input.pace:1});return {audioBase64:result.audio.toString("base64"),requestId:result.requestId,model:result.model,mimeType:"audio/mpeg"}}
-   case "audio.denoise":await denoiseAudio(String(input.inputPath??""),String(input.outputPath??""));return {outputPath:String(input.outputPath)};
+   case "audio.denoise":await denoiseAudio(String(input.inputPath??""),String(input.outputPath??""),{signal});return {outputPath:String(input.outputPath)};
    default:throw new Error("Unsupported Sarvam worker task: "+task.kind);
   }
  }};
