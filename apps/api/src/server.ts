@@ -26,6 +26,7 @@ import {createRenderJobFromTimeline} from "./rendering.js";
 import {reviewRenderJob} from "./timeline.js";
 import {runAgentPipeline,listAgentRuns,getAgentRun,decideAgentRun,applyApprovedBriefPatch} from "./agents.js";
 import {requestPasswordReset,resetPassword} from "./auth.js";
+import {enqueueMediaTask,getMediaTask,listMediaTasks} from "./media-tasks.js";
 
 
 
@@ -170,6 +171,9 @@ app.post("/v1/auth/login",async(request,reply)=>{try{const b=request.body as any
 app.get("/v1/auth/me",async(request)=>({user:(request as any).user}));
 app.post("/v1/auth/logout",async(request,reply)=>{const token=request.headers.authorization?.slice(7)??"";await revokeSession(token);return reply.code(204).send()});
 app.post("/v1/projects/:id/transfer-owner",async(request,reply)=>{try{const user=(request as any).user as AuthUser;if(user.global_role!=="admin")return reply.code(403).send({error:"Admin role required"});const p=request.params as any;const b=request.body as any;return await transferProjectOwnership(p.id,b?.userId,user.id)}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.post("/v1/projects/:id/media-tasks",async(request,reply)=>{try{const p=request.params as any;const user=(request as any).user as AuthUser;const b=request.body as any;if(!b||typeof b.kind!=="string"||!b.input||typeof b.input!=="object")return reply.code(400).send({error:"kind and input are required"});return reply.code(202).send(await enqueueMediaTask(p.id,user.id,b))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
+app.get("/v1/projects/:id/media-tasks",async(request)=>listMediaTasks((request.params as any).id));
+app.get("/v1/projects/:id/media-tasks/:taskId",async(request,reply)=>{const p=request.params as any;const result=await getMediaTask(p.id,p.taskId);if(!result)return reply.code(404).send({error:"Media task not found"});return result});
 app.post("/v1/projects/:id/agent-pipeline/runs",async(request,reply)=>{try{const p=request.params as any;const user=(request as any).user as AuthUser;return reply.status(201).send(await runAgentPipeline(p.id,user.id,request.body as any??{}))}catch(e){return reply.code(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/agent-pipeline/runs",async(request)=>listAgentRuns((request.params as any).id));
 app.get("/v1/projects/:id/agent-pipeline/runs/:runId",async(request,reply)=>{const p=request.params as any;const row=await getAgentRun(p.id,p.runId);if(!row)return reply.code(404).send({error:"Agent run not found"});return row});
