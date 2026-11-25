@@ -77,19 +77,21 @@ app.addHook("preHandler",async(request,reply)=>{
  let projectId=pathProject??resourceProject??explicitProject;
  if(projectId&&request.body&&typeof request.body==="object"&&(request.method==="POST"||request.method==="PUT"||request.method==="PATCH"))(request.body as any).createdBy=user.email;
  if(request.body&&typeof request.body==="object"&&/(review|approve|safety-review)$/.test(pathname))(request.body as any).reviewer=user.email;
- if(user.global_role!=="admin"){
-  if(pathname.startsWith("/v1/providers")||pathname.startsWith("/v1/intelligence/cache/"))return reply.code(403).send({error:"Admin role required"});
-  if((pathname.startsWith("/v1/generation-jobs/")&&pathname.endsWith("/transition"))||(pathname.startsWith("/v1/workflows/")&&(pathname.endsWith("/transition")||pathname.endsWith("/checkpoints"))))return reply.code(403).send({error:"Admin role required for worker operations"});
-  if(pathname==="/v1/memory/search"&&!projectId)return reply.code(403).send({error:"Project scope required"});
-  if(pathname.startsWith("/v1/workflows/")&&!projectId)return reply.code(403).send({error:"Project scope required"});
- }
- if(!projectId&&request.method!=="GET"&&pathname!=="/v1/projects"&&pathname!=="/v1/auth/logout"&&user.global_role!=="admin")return reply.code(403).send({error:"Admin role required for global mutation"});
  if(projectId){
+  // Resolve membership/ownership before admin-only operation checks so foreign
+  // resources are concealed consistently (404) instead of revealing route policy (403).
   const role=await getProjectRole(user,projectId);if(!role)return reply.code(404).send({error:"Project not found"});
   const readOnly=request.method==="GET",reviewerAction=/\/review$|safety-review|\/approve$/.test(pathname);
   const canEdit=["owner","editor"].includes(role),canReview=["owner","editor","reviewer"].includes(role);
   if(!readOnly&&!(reviewerAction?canReview:canEdit))return reply.code(403).send({error:"Insufficient project role"});
  }
+ if(user.global_role!=="admin"){
+  if(pathname.startsWith("/v1/providers")||pathname.startsWith("/v1/intelligence/cache/"))return reply.code(403).send({error:"Admin role required"});
+  if((pathname.startsWith("/v1/generation-jobs/")&&pathname.endsWith("/transition"))||(pathname.startsWith("/v1/workflows/")&&(pathname.endsWith("/transition")||(request.method==="POST"&&pathname.endsWith("/checkpoints")))))return reply.code(403).send({error:"Admin role required for worker operations"});
+  if(pathname==="/v1/memory/search"&&!projectId)return reply.code(403).send({error:"Project scope required"});
+  if(pathname.startsWith("/v1/workflows/")&&!projectId)return reply.code(403).send({error:"Project scope required"});
+ }
+ if(!projectId&&request.method!=="GET"&&pathname!=="/v1/projects"&&pathname!=="/v1/auth/logout"&&user.global_role!=="admin")return reply.code(403).send({error:"Admin role required for global mutation"});
 });app.post("/v1/projects/:id/production-cuts/:cutId/audio-plans",async(request,reply)=>{try{const p=request.params as {id:string;cutId:string};const b=request.body as {assetAssignments?:Record<string,string>;createdBy?:string};return reply.status(201).send(await createAudioPlan(p.id,p.cutId,b?.assetAssignments??{},b?.createdBy))}catch(e){return reply.status(400).send({error:e instanceof Error?e.message:String(e)})}});
 app.get("/v1/projects/:id/audio-plans",async(request)=>listAudioPlans((request.params as {id:string}).id));
 app.get("/v1/projects/:id/audio-plans/:planId",async(request,reply)=>{const p=request.params as {id:string;planId:string};const r=await getAudioPlan(p.id,p.planId);if(!r)return reply.status(404).send({error:"Audio plan not found"});return r});
