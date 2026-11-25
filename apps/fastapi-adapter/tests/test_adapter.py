@@ -47,3 +47,31 @@ async def test_proxy_preserves_method_path_query_headers_body(monkeypatch):
     assert captured["url"] == "https://api.example.test/v1/projects?sort=recent"
     assert captured["authorization"] == "Bearer test-token"
     assert b"Demo" in captured["body"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status,payload,expected",
+    [
+        (401, {"ready": False}, 503),
+        (404, {"ready": False}, 503),
+        (200, {"ready": False}, 503),
+        (200, {"ready": True}, 200),
+    ],
+)
+async def test_ready_requires_explicit_upstream_confirmation(monkeypatch, status, payload, expected):
+    monkeypatch.setattr(main, "UPSTREAM", "https://api.example.test")
+
+    async def handler(request: httpx.Request):
+        return httpx.Response(status, json=payload)
+
+    monkeypatch.setattr(
+        main.httpx,
+        "AsyncClient",
+        lambda **kwargs: RealAsyncClient(
+            transport=httpx.MockTransport(handler), **kwargs
+        ),
+    )
+    response = client.get("/ready")
+    assert response.status_code == expected
+    assert response.json()["ready"] is (expected == 200)
