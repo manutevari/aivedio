@@ -47,7 +47,7 @@ async function runAgentPipelineInternal(projectId:string,userId:string,input:Jso
  const researchSources=Array.isArray(input.researchSources)?input.researchSources.slice(0,20).map((source:any,index:number)=>({
   id:String(source?.id??"source-"+(index+1)).slice(0,80),
   title:String(source?.title??"").slice(0,300),
-  url:typeof source?.url==="string"&&/^https?:\\/\\//i.test(source.url)?source.url.slice(0,2000):"",
+  url:typeof source?.url==="string"&&/^https?:\/\//i.test(source.url)?source.url.slice(0,2000):"",
   excerpt:String(source?.excerpt??"").slice(0,5000)
  })): [];
  const researchRequired=input.researchRequired===true||researchContext.trim().length>0||researchSources.length>0;
@@ -74,7 +74,8 @@ async function runAgentPipelineInternal(projectId:string,userId:string,input:Jso
    if((finding.sourceIds as string[]).some(id=>!allowedSourceIds.has(id)))throw new Error("Researcher cited a source ID that was not supplied");
   }
  }
- context.research=research;\n context.production=production;
+ context.research=research;
+ context.production=production;
  const improvisor=await agentTrace("Improvisor",projectId)({context,research,production});
  const implementation=await agentTrace("Implementation Agent",projectId)({context,research,production,improvisor});
  const patch=await agentTrace("Patcher",projectId)({context,research,production,improvisor,implementation});
