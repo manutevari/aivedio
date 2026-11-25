@@ -12,3 +12,9 @@ export async function enqueueMediaTask(projectId:string,userId:string,input:{kin
 }
 export async function getMediaTask(projectId:string,id:string){return (await requireDb().query("SELECT * FROM media_task_jobs WHERE project_id=$1 AND id=$2",[projectId,id])).rows[0]??null}
 export async function listMediaTasks(projectId:string){return (await requireDb().query("SELECT id,kind,execution_mode,status,attempt,error,created_at,updated_at,completed_at FROM media_task_jobs WHERE project_id=$1 ORDER BY created_at DESC LIMIT 100",[projectId])).rows}
+
+export async function reviewMediaTask(projectId:string,id:string,userId:string,decision:"approve"|"reject",notes?:string){
+ const status=decision==="approve"?"completed":"failed";
+ const r=await requireDb().query("UPDATE media_task_jobs SET status=$3,reviewed_by=$4,reviewed_at=now(),review_notes=$5,error=CASE WHEN $3='failed' THEN COALESCE($5,'Rejected during human review') ELSE NULL END,completed_at=now(),updated_at=now() WHERE project_id=$1 AND id=$2 AND status='awaiting_review' RETURNING id,project_id,status,reviewed_by,reviewed_at,review_notes",[projectId,id,status,userId,notes??null]);
+ return r.rows[0]??null;
+}
