@@ -19,7 +19,7 @@ export async function reviewMediaTask(projectId:string,id:string,userId:string,d
  return r.rows[0]??null;
 }
 
-export async function cancelMediaTask(projectId:string,id:string,userId:string){
+export async function cancelMediaTask(projectId:string,id:string){
  const r=await requireDb().query("UPDATE media_task_jobs SET status='cancelled',lease_owner=NULL,lease_expires_at=NULL,error='Cancelled by project member',updated_at=now(),completed_at=now() WHERE project_id=$1 AND id=$2 AND status IN ('queued','retrying','running') RETURNING id,project_id,status,updated_at,completed_at",[projectId,id]);
  return r.rows[0]??null;
 }
