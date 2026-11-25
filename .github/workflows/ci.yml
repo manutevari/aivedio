@@ -35,11 +35,11 @@ jobs:
       AIVEDIO_ALLOW_SELF_REGISTRATION: "true"
       AIVEDIO_E2E_PORT: 3419
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Install dependencies
