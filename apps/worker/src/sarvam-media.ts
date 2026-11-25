@@ -1,4 +1,6 @@
 import {spawn} from "node:child_process";
+import {realpath,lstat} from "node:fs/promises";
+import {resolve,relative,dirname,isAbsolute} from "node:path";
 import type {MediaTaskContract,MediaTaskHandler} from "@aivedio/core";
 type SarvamOptions={apiKey?:string;baseUrl?:string;timeoutMs?:number};
 const API="https://api.sarvam.ai";
@@ -25,10 +27,18 @@ export async function sarvamSynthesize(input:{text:string;languageCode:string;sp
 /** Apply non-destructive FFmpeg denoising into a separate output file; never overwrite the source. */
 export async function denoiseAudio(inputPath:string,outputPath:string,options:{noiseFloorDb?:number;highpassHz?:number;lowpassHz?:number}={}):Promise<void>{
  if(inputPath===outputPath)throw new Error("Noise cancellation must write to a new output path");
+ const root=process.env.MEDIA_WORK_DIR;if(!root)throw new Error("MEDIA_WORK_DIR must be configured for audio denoising");
+ const workRoot=await realpath(root);
+ const inside=(candidate:string)=>{const rel=relative(workRoot,candidate);return rel!==""&&!rel.startsWith(".."+(process.platform==="win32"?"\\":"/"))&&rel!==".."&&!isAbsolute(rel)};
+ const source=resolve(workRoot,inputPath),target=resolve(workRoot,outputPath);
+ if(!inside(source)||!inside(target))throw new Error("Audio paths must stay inside MEDIA_WORK_DIR");
+ const actualSource=await realpath(source);if(!inside(actualSource))throw new Error("Input audio symlink escapes MEDIA_WORK_DIR");
+ const actualParent=await realpath(dirname(target));if(!inside(actualParent))throw new Error("Output directory escapes MEDIA_WORK_DIR");
+ try{const existing=await lstat(target);if(existing.isSymbolicLink())throw new Error("Output path cannot be a symlink");throw new Error("Output file already exists; choose a new path")}catch(e){if(e instanceof Error&&e.message!=="ENOENT")throw e;}
  const nf=Math.max(-80,Math.min(-10,options.noiseFloorDb??-25));
  const hp=Math.max(20,Math.min(1000,options.highpassHz??80));
  const lp=Math.max(2000,Math.min(20000,options.lowpassHz??12000));
- await new Promise<void>((resolve,reject)=>{const p=spawn("ffmpeg",["-nostdin","-y","-i",inputPath,"-af",`highpass=f=${hp},lowpass=f=${lp},afftdn=nf=${nf}:tn=1:tr=1`,"-c:a","libmp3lame","-q:a","2",outputPath],{stdio:["ignore","ignore","pipe"]});let err="";p.stderr.on("data",d=>{err=(err+String(d)).slice(-4000)});p.on("error",reject);p.on("close",code=>code===0?resolve():reject(new Error("FFmpeg denoise failed ("+code+"): "+err)))});
+ await new Promise<void>((resolve,reject)=>{const p=spawn("ffmpeg",["-nostdin","-n","-i",source,"-af",`highpass=f=${hp},lowpass=f=${lp},afftdn=nf=${nf}:tn=1:tr=1`,"-c:a","libmp3lame","-q:a","2",target],{stdio:["ignore","ignore","pipe"]});let err="";p.stderr.on("data",d=>{err=(err+String(d)).slice(-4000)});p.on("error",reject);p.on("close",code=>code===0?resolve():reject(new Error("FFmpeg denoise failed ("+code+"): "+err)))});
 }
 export function createSarvamMediaHandler():MediaTaskHandler {
  return {async execute(task:MediaTaskContract,signal:AbortSignal){
