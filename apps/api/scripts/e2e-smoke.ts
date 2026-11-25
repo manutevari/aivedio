@@ -93,7 +93,7 @@ try{
  const criticGateRun=(await db.query("INSERT INTO agent_pipeline_runs(project_id,input,audit,patch,status) VALUES($1,$2::jsonb,$3::jsonb,$4::jsonb,'awaiting_approval') RETURNING id",[project.id,{production:{scriptCritic:{verdict:"fail",findings:[]},videoCritic:{verdict:"pass",findings:[]},quality:{verdict:"pass",findings:[]}}},{verdict:"pass",score:99,findings:[]},{target:"projects.creative_brief",before:"before",after:"after"}])).rows[0].id;
  const criticApproval=await fetch(baseUrl+`/v1/projects/${project.id}/agent-pipeline/runs/${criticGateRun}/decision`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({decision:"approve",notes:"CI must block failed critic"})});
  assert.equal(criticApproval.status,400,"A failed production critic must block human approval even when the Auditor passes");
- assert.match((await criticApproval.json()).error,/Auditor marked it unsafe for approval/,"Critic approval rejection must come from the deterministic safety gate, not a database error");
+ assert.match((await criticApproval.json()).error,/auditor marked it unsafe for approval/i,"Critic approval rejection must come from the deterministic safety gate, not a database error");
  const mediaTask=await request("POST",`/v1/projects/${project.id}/media-tasks`,{kind:"text.translate",mode:"async",input:{text:"Hello",sourceLanguageCode:"en-IN",targetLanguageCode:"hi-IN"}},202);
  assert.ok(mediaTask.id,"Media task enqueue must return an id");
  const cancelledMediaTask=await request("POST",`/v1/projects/${project.id}/media-tasks/${mediaTask.id}/cancel`,{},200);
