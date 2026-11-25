@@ -4,11 +4,16 @@ on:
     branches: [main, feature/phase1-foundation]
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: aivedio-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
