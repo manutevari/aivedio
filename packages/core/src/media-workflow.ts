@@ -36,7 +36,7 @@ export async function executeMediaWorkflow(tasks:MediaTaskContract[],handlers:Pa
   const handler=handlers[task.kind];if(!handler){result.status="failed";result.error="No handler registered for "+task.kind;result.completedAt=now();await options.onStatus?.(result);return}
   while(attempts<=task.maxRetries){
    attempts++;result.attempts=attempts;const controller=new AbortController();
-   try{result.output=await withTimeout(handler.execute(task,controller.signal),task.timeoutMs||options.defaultTimeoutMs||60000,controller);result.status=task.requiresApproval?"awaiting_review":"completed";result.completedAt=now();result.error=undefined;break}
+   try{result.output=await withTimeout(handler.execute(task,controller.signal),task.timeoutMs||options.defaultTimeoutMs||60000,controller);result.status=task.requiresApproval?"awaiting_review":"completed";result.completedAt=now();delete result.error;break}
    catch(e){result.error=e instanceof Error?e.message:String(e);result.status=attempts<=task.maxRetries?"retrying":"failed";if(attempts<=task.maxRetries)await new Promise(r=>setTimeout(r,Math.min(5000,250*2**(attempts-1))))}
   }
   await options.onStatus?.(result);
