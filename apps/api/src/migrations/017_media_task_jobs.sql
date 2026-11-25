@@ -17,7 +17,10 @@ CREATE TABLE IF NOT EXISTS media_task_jobs(
  created_by UUID,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
- completed_at TIMESTAMPTZ
+ completed_at TIMESTAMPTZ,
+ reviewed_by UUID,
+ reviewed_at TIMESTAMPTZ,
+ review_notes TEXT
 );
 CREATE INDEX IF NOT EXISTS media_task_jobs_claim_idx ON media_task_jobs(status,available_at,created_at);
 CREATE INDEX IF NOT EXISTS media_task_jobs_project_idx ON media_task_jobs(project_id,created_at DESC);
