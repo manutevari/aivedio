@@ -1,0 +1,69 @@
+from fastapi.testclient import TestClient
+
+from app import main
+
+
+client = TestClient(main.app)
+
+
+def test_health_is_live_without_secrets():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_ready_fails_closed_without_runtime_configuration(monkeypatch):
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "INTERNAL_TOKEN", "")
+    monkeypatch.setattr(main, "OPENROUTER_KEY", "")
+    monkeypatch.setattr(main.app.state, "graph", None)
+    response = client.get("/ready")
+    assert response.status_code == 503
+
+
+def test_internal_routes_reject_missing_bearer_token():
+    response = client.post(
+        "/internal/v1/agent-runs",
+        json={
+            "thread_id": "thread-test-123",
+            "project_id": "project-1",
+            "user_id": "user-1",
+            "brief": "A test brief",
+        },
+    )
+    assert response.status_code == 401
+
+
+def test_internal_routes_fail_closed_if_token_not_configured(monkeypatch):
+    monkeypatch.setattr(main, "INTERNAL_TOKEN", "")
+    response = client.post(
+        "/internal/v1/agent-runs",
+        headers={"Authorization": "Bearer anything"},
+        json={
+            "thread_id": "thread-test-456",
+            "project_id": "project-1",
+            "user_id": "user-1",
+            "brief": "A test brief",
+        },
+    )
+    assert response.status_code == 503
+
+
+def test_audit_routes_to_human_gate_only_when_passed():
+    state = {"audit": {"verdict": "pass", "score": 80, "findings": []}, "repair_count": 0}
+    assert main._route_after_audit(state) == "human_gate"
+
+
+def test_audit_retries_patch_for_noncritical_failure_with_budget():
+    state = {"audit": {"verdict": "needs_changes", "score": 50, "findings": []}, "repair_count": 0}
+    assert main._route_after_audit(state) == "patcher"
+
+
+def test_audit_blocks_after_repair_budget_exhausted():
+    state = {"audit": {"verdict": "fail", "score": 10, "findings": []}, "repair_count": 2}
+    assert main._route_after_audit(state) == "human_gate"
+
+
+def test_critical_audit_finding_never_routes_to_approval():
+    state = {"audit": {"verdict": "pass", "score": 99, "findings": [{"severity": "critical"}]}, "repair_count": 2}
+    assert main._route_after_audit(state) == "human_gate"
