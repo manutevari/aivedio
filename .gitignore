@@ -1,6 +1,41 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+.vercel/
+
+# Environment and secrets
 .env
-.env.local
-coverage
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Testing and coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS and editor
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Keep dependency lockfiles tracked
+!pnpm-lock.yaml
