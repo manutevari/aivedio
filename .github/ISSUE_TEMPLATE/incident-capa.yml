@@ -1,0 +1,77 @@
+name: Incident / CAPA
+description: Record an incident with evidence, risk controls, and human approval gates.
+title: "[INCIDENT] "
+labels: ["incident"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this record for defects, security findings, reliability incidents, and release blockers. Redact secrets and personal data. Do not treat this issue as deployment authorization.
+  - type: input
+    id: observed
+    attributes:
+      label: First observed (UTC)
+      placeholder: "YYYY-MM-DD HH:MM UTC"
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and affected scope
+      description: Affected services, tenants, routes, data, users, and blast radius.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected/actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence links (redacted)
+      description: Logs, screenshots, traces, CI runs, commit SHAs. Never paste secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: rca
+    attributes:
+      label: RCA — confirmed facts, hypotheses, confidence, unknowns
+    validations:
+      required: false
+  - type: textarea
+    id: capa
+    attributes:
+      label: Corrective action, preventive action, regression tests
+    validations:
+      required: false
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback and monitoring plan
+    validations:
+      required: false
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Human approval gates
+      options:
+        - label: RCA accepted by human (record approver and UTC timestamp in comments)
+        - label: Fix/diff accepted by human for this exact commit SHA
+        - label: Independent verification reviewed and accepted
+        - label: Merge explicitly authorized
+        - label: Production deployment explicitly authorized for named environment and commit SHA
+        - label: Closure explicitly authorized by incident owner
+          required: false
