@@ -93,6 +93,12 @@ jobs:
           python -m pytest -q apps/fastapi-adapter/tests
       - name: FastAPI adapter syntax check
         run: python -m compileall -q apps/fastapi-adapter/app apps/fastapi-adapter/tests
+      - name: Python LangGraph service tests
+        run: |
+          python -m pip install -e "apps/python-api[test]"
+          python -m pytest -q apps/python-api/tests
+      - name: Python LangGraph service syntax check
+        run: python -m compileall -q apps/python-api/app apps/python-api/tests
       - name: Python syntax check
         run: |
           python -m compileall -q apps/streamlit apps/asset-worker apps/audio-worker apps/qa-worker
