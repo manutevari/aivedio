@@ -61,14 +61,12 @@ jobs:
             docker rm -f "$container_name" >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-
           docker run -d --name "$container_name" -p 127.0.0.1:3419:3000 \
             -e NODE_ENV=production \
             -e PORT=3000 \
             -e AIVEDIO_SESSION_SECRET=ci-session-secret-at-least-32-characters-long \
             -e AIVEDIO_ALLOWED_ORIGINS=https://aivedio.streamlit.app \
             aivedio-api-ci
-
           for i in {1..30}; do
             if curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:3419/health; then
               echo "API container health smoke passed"
@@ -76,7 +74,6 @@ jobs:
             fi
             sleep 2
           done
-
           echo "API container did not become healthy within 60 seconds" >&2
           exit 1
       - name: Apply migrations to disposable CI database
@@ -93,9 +90,14 @@ jobs:
           python -m pytest -q apps/fastapi-adapter/tests
       - name: FastAPI adapter syntax check
         run: python -m compileall -q apps/fastapi-adapter/app apps/fastapi-adapter/tests
-      - name: Python syntax check
+      - name: Python LangGraph service tests
         run: |
-          python -m compileall -q apps/streamlit apps/asset-worker apps/audio-worker apps/qa-worker
+          python -m pip install -e "apps/python-api[test]"
+          cd apps/python-api
+          python -m pytest -q
+          python -m compileall -q app tests
+      - name: Python syntax check
+        run: python -m compileall -q apps/streamlit apps/asset-worker apps/audio-worker apps/qa-worker
       - name: Check Python worker requirements
         run: |
           python -m pip install --dry-run -r apps/streamlit/requirements.txt
