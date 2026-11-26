@@ -2,8 +2,11 @@ from fastapi.testclient import TestClient
 
 from app import main
 
-
 client = TestClient(main.app)
+
+
+def _payload(thread_id="thread-test-123"):
+    return {"thread_id": thread_id, "project_id": "project-1", "user_id": "user-1", "brief": "A test brief"}
 
 
 def test_health_is_live_without_secrets():
@@ -17,35 +20,30 @@ def test_ready_fails_closed_without_runtime_configuration(monkeypatch):
     monkeypatch.setattr(main, "INTERNAL_TOKEN", "")
     monkeypatch.setattr(main, "OPENROUTER_KEY", "")
     monkeypatch.setattr(main.app.state, "graph", None)
-    response = client.get("/ready")
-    assert response.status_code == 503
+    assert client.get("/ready").status_code == 503
 
 
 def test_internal_routes_reject_missing_bearer_token():
-    response = client.post(
-        "/internal/v1/agent-runs",
-        json={
-            "thread_id": "thread-test-123",
-            "project_id": "project-1",
-            "user_id": "user-1",
-            "brief": "A test brief",
-        },
-    )
-    assert response.status_code == 401
+    assert client.post("/internal/v1/agent-runs", json=_payload()).status_code == 401
 
 
 def test_internal_routes_fail_closed_if_token_not_configured(monkeypatch):
     monkeypatch.setattr(main, "INTERNAL_TOKEN", "")
-    response = client.post(
-        "/internal/v1/agent-runs",
-        headers={"Authorization": "Bearer anything"},
-        json={
-            "thread_id": "thread-test-456",
-            "project_id": "project-1",
-            "user_id": "user-1",
-            "brief": "A test brief",
-        },
-    )
+    response = client.post("/internal/v1/agent-runs", headers={"Authorization": "Bearer anything"}, json=_payload("thread-test-456"))
+    assert response.status_code == 503
+
+
+def test_invalid_token_is_rejected_before_readiness(monkeypatch):
+    monkeypatch.setattr(main, "INTERNAL_TOKEN", "expected-secret")
+    monkeypatch.setattr(main.app.state, "graph", None)
+    response = client.post("/internal/v1/agent-runs", headers={"Authorization": "Bearer wrong-secret"}, json=_payload("thread-test-789"))
+    assert response.status_code == 401
+
+
+def test_valid_token_reaches_readiness_and_returns_503(monkeypatch):
+    monkeypatch.setattr(main, "INTERNAL_TOKEN", "expected-secret")
+    monkeypatch.setattr(main.app.state, "graph", None)
+    response = client.post("/internal/v1/agent-runs", headers={"Authorization": "Bearer expected-secret"}, json=_payload("thread-test-101"))
     assert response.status_code == 503
 
 
@@ -87,23 +85,12 @@ def test_langgraph_checkpoint_pause_and_resume_at_human_gate(monkeypatch):
     monkeypatch.setattr(main, "_json_call", fake_json_call)
     graph = main.build_graph(InMemorySaver())
     config = {"configurable": {"thread_id": "test-thread-pause-resume"}}
-    initial = {
-        "thread_id": "test-thread-pause-resume",
-        "project_id": "project-1",
-        "user_id": "user-1",
-        "brief": "Original brief",
-        "requested_outcome": "Improve clarity",
-        "repair_count": 0,
-    }
-
+    initial = {"thread_id": "test-thread-pause-resume", "project_id": "project-1", "user_id": "user-1",
+               "brief": "Original brief", "requested_outcome": "Improve clarity", "repair_count": 0}
     graph.invoke(initial, config=config)
     paused = graph.get_state(config)
     assert paused.next == ("human_gate",)
     assert paused.values["audit"]["verdict"] == "pass"
-
-    resumed = graph.invoke(
-        Command(resume={"decision": "approve", "actor_id": "trusted-test-reviewer", "notes": "Test approval"}),
-        config=config,
-    )
+    resumed = graph.invoke(Command(resume={"decision": "approve", "actor_id": "trusted-test-reviewer", "notes": "Test approval"}), config=config)
     assert resumed["status"] == "approved"
     assert resumed["approval"]["decision"] == "approve"
