@@ -5,7 +5,6 @@ import hmac
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Literal, TypedDict
-from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -153,8 +152,8 @@ def build_graph(checkpointer: Any):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.checkpointer_context = None
     app.state.graph = None
+    app.state.checkpointer_context = None
     if DATABASE_URL:
         context = PostgresSaver.from_conn_string(DATABASE_URL)
         checkpointer = context.__enter__()
@@ -169,13 +168,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AIVEDIO Python Agent Service", version="0.1.0", lifespan=lifespan)
+app.state.graph = None
+app.state.checkpointer_context = None
 
 
 def require_internal_token(authorization: str | None = Header(default=None)) -> None:
+    scheme, _, supplied = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not supplied:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     if not INTERNAL_TOKEN:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Internal service authentication is not configured")
-    scheme, _, supplied = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not supplied or not hmac.compare_digest(supplied, INTERNAL_TOKEN):
+    if not hmac.compare_digest(supplied, INTERNAL_TOKEN):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
 
@@ -186,30 +189,39 @@ def health() -> dict[str, str]:
 
 @app.get("/ready")
 def ready() -> dict[str, Any]:
-    configured = bool(DATABASE_URL and INTERNAL_TOKEN and OPENROUTER_KEY and app.state.graph)
+    graph = getattr(app.state, "graph", None)
+    configured = bool(DATABASE_URL and INTERNAL_TOKEN and OPENROUTER_KEY and graph)
     if not configured:
-        raise HTTPException(status_code=503, detail={"ready": False, "database": bool(DATABASE_URL), "internal_auth": bool(INTERNAL_TOKEN), "model_key": bool(OPENROUTER_KEY), "graph": bool(app.state.graph)})
+        raise HTTPException(status_code=503, detail={
+            "ready": False,
+            "database": bool(DATABASE_URL),
+            "internal_auth": bool(INTERNAL_TOKEN),
+            "model_key": bool(OPENROUTER_KEY),
+            "graph": bool(graph),
+        })
     return {"ready": True, "workflow": "langgraph", "checkpointer": "postgres"}
 
 
 @app.post("/internal/v1/agent-runs", dependencies=[Depends(require_internal_token)])
 def start_run(payload: StartRun) -> dict[str, Any]:
-    if app.state.graph is None:
+    graph = getattr(app.state, "graph", None)
+    if graph is None:
         raise HTTPException(status_code=503, detail="Graph/checkpointer is not initialized")
     config = {"configurable": {"thread_id": payload.thread_id}}
     state: AgentState = payload.model_dump()
-    result = app.state.graph.invoke(state, config=config)
-    snapshot = app.state.graph.get_state(config)
+    result = graph.invoke(state, config=config)
+    snapshot = graph.get_state(config)
     return {"thread_id": payload.thread_id, "status": result.get("status", "paused"), "state": result, "next": list(snapshot.next)}
 
 
 @app.post("/internal/v1/agent-runs/{thread_id}/decision", dependencies=[Depends(require_internal_token)])
 def decide_run(thread_id: str, payload: Decision) -> dict[str, Any]:
-    if app.state.graph is None:
+    graph = getattr(app.state, "graph", None)
+    if graph is None:
         raise HTTPException(status_code=503, detail="Graph/checkpointer is not initialized")
     config = {"configurable": {"thread_id": thread_id}}
-    snapshot = app.state.graph.get_state(config)
+    snapshot = graph.get_state(config)
     if not snapshot or not snapshot.next:
         raise HTTPException(status_code=409, detail="No paused approval is available for this run")
-    result = app.state.graph.invoke(Command(resume={"decision": payload.decision, "actor_id": payload.actor_id, "notes": payload.notes}), config=config)
+    result = graph.invoke(Command(resume={"decision": payload.decision, "actor_id": payload.actor_id, "notes": payload.notes}), config=config)
     return {"thread_id": thread_id, "status": result.get("status", "completed"), "state": result}
