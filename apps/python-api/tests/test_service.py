@@ -67,3 +67,43 @@ def test_audit_blocks_after_repair_budget_exhausted():
 def test_critical_audit_finding_never_routes_to_approval():
     state = {"audit": {"verdict": "pass", "score": 99, "findings": [{"severity": "critical"}]}, "repair_count": 2}
     assert main._route_after_audit(state) == "human_gate"
+
+
+def test_langgraph_checkpoint_pause_and_resume_at_human_gate(monkeypatch):
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.types import Command
+
+    def fake_json_call(role, instruction, payload):
+        if role == "Improvisor":
+            return {"ideas": [], "recommendedDirection": "Keep the brief clear", "assumptions": []}
+        if role == "Implementation Agent":
+            return {"steps": [], "requirements": [], "risks": [], "rollback": "Restore previous brief"}
+        if role == "Patcher":
+            return {"target": "projects.creative_brief", "before": payload["brief"], "after": payload["brief"] + " refined", "summary": "Clarified brief", "reversible": True}
+        if role == "Auditor":
+            return {"verdict": "pass", "score": 90, "findings": [], "summary": "Pass"}
+        raise AssertionError(role)
+
+    monkeypatch.setattr(main, "_json_call", fake_json_call)
+    graph = main.build_graph(InMemorySaver())
+    config = {"configurable": {"thread_id": "test-thread-pause-resume"}}
+    initial = {
+        "thread_id": "test-thread-pause-resume",
+        "project_id": "project-1",
+        "user_id": "user-1",
+        "brief": "Original brief",
+        "requested_outcome": "Improve clarity",
+        "repair_count": 0,
+    }
+
+    graph.invoke(initial, config=config)
+    paused = graph.get_state(config)
+    assert paused.next == ("human_gate",)
+    assert paused.values["audit"]["verdict"] == "pass"
+
+    resumed = graph.invoke(
+        Command(resume={"decision": "approve", "actor_id": "trusted-test-reviewer", "notes": "Test approval"}),
+        config=config,
+    )
+    assert resumed["status"] == "approved"
+    assert resumed["approval"]["decision"] == "approve"
