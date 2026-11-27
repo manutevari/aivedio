@@ -11,14 +11,9 @@ export * from "./media.js";
 export * from "./timeline.js";
 export * from "./editing.js";
 export * from "./creative-director.js";
-export * from './creative-director.js';
-export * from './scriptwriting.js';
-export * from './asset-intelligence.js';
-
-export * from './quality.js';
-
-export * from './production-editing.js';
-
-export * from './audio-intelligence.js';
-
+export * from "./scriptwriting.js";
+export * from "./asset-intelligence.js";
+export * from "./quality.js";
+export * from "./production-editing.js";
+export * from "./audio-intelligence.js";
 export * from "./rendering.js";
