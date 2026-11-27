@@ -2,40 +2,57 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildProductionGraph, createScene, splitScene } from "../src/flow-engine.js";
 
-test("production graph includes producer, director and cinematography checkpoints", () => {
+test("HITL is the top-level gate before producer and every agent task", () => {
   const scene = createScene(1, "Opening");
   scene.prompt = "A quiet sunrise over the city";
-  scene.producerPlan = { budgetNotes: "Use existing locations", deliverables: ["4K master"] };
-  scene.directorBrief = { creativeVision: "Restrained and intimate", storyIntent: "Introduce the lead" };
-  scene.cinematographyDesign = { shotType: "Wide", lens: "35mm", cameraMovement: "Slow dolly", lighting: "Golden hour", framing: "Rule of thirds" };
-
   const graph = buildProductionGraph([scene]);
   const byType = new Map(graph.map((task) => [task.taskType, task]));
 
-  assert.deepEqual(byType.get("producer")?.dependsOn, []);
-  assert.equal(byType.get("producer")?.status, "ready");
-  assert.equal(byType.get("producer")?.checkpoint, true);
+  const hitl = byType.get("hitl_preflight")!;
+  assert.equal(hitl.role, "human_supervisor");
+  assert.equal(hitl.status, "awaiting_approval");
+  assert.equal(hitl.requiresApproval, true);
+  assert.deepEqual(byType.get("producer")?.dependsOn, [hitl.id]);
+  assert.equal(byType.get("producer")?.status, "pending");
   assert.deepEqual(byType.get("director")?.dependsOn, [scene.id + ":producer"]);
   assert.deepEqual(byType.get("cinematography")?.dependsOn, [scene.id + ":director"]);
   assert.deepEqual(byType.get("script")?.dependsOn, [scene.id + ":director"]);
   assert.deepEqual(byType.get("image")?.dependsOn, [scene.id + ":script", scene.id + ":cinematography"]);
   assert.deepEqual(byType.get("video")?.dependsOn, [scene.id + ":image", scene.id + ":cinematography"]);
+  assert.deepEqual(byType.get("voice")?.dependsOn, [scene.id + ":script"]);
   assert.deepEqual(byType.get("qa")?.dependsOn, [scene.id + ":video", scene.id + ":voice"]);
-  assert.equal(byType.get("director_review")?.requiresApproval, true);
-  assert.equal(byType.get("producer_approval")?.requiresApproval, true);
+});
+
+test("director, producer and final HITL approvals are explicit gates", () => {
+  const scene = createScene(1, "Approval");
+  const graph = buildProductionGraph([scene]);
+  const byType = new Map(graph.map((task) => [task.taskType, task]));
+
+  for (const type of ["director_review", "producer_approval", "hitl_final"] as const) {
+    assert.equal(byType.get(type)?.requiresApproval, true);
+    assert.equal(byType.get(type)?.checkpoint, true);
+    assert.equal(byType.get(type)?.status, "awaiting_approval");
+  }
   assert.deepEqual(byType.get("producer_approval")?.dependsOn, [scene.id + ":director_review"]);
-  assert.equal(byType.get("cinematography")?.input.design && (byType.get("cinematography")?.input.design as { lens: string }).lens, "35mm");
+  assert.deepEqual(byType.get("hitl_final")?.dependsOn, [scene.id + ":producer_approval"]);
+});
+
+test("all tasks expose durable HITL notification events", () => {
+  const graph = buildProductionGraph([createScene(1)]);
+  for (const task of graph) {
+    assert.equal(task.notificationChannel, "workflow_event");
+    assert.deepEqual(task.notifyHumanOn, ["ready", "started", "completed", "failed", "blocked", "approval_required"]);
+  }
 });
 
 test("production graph creates independent role and approval tasks per scene", () => {
   const scenes = [createScene(1, "One"), createScene(2, "Two")];
   const graph = buildProductionGraph(scenes);
-  assert.equal(graph.length, 20);
+  assert.equal(graph.length, 24);
   for (const scene of scenes) {
-    assert.ok(graph.some((task) => task.id === scene.id + ":producer"));
-    assert.ok(graph.some((task) => task.id === scene.id + ":director"));
-    assert.ok(graph.some((task) => task.id === scene.id + ":cinematography"));
-    assert.ok(graph.some((task) => task.id === scene.id + ":producer_approval"));
+    for (const suffix of ["hitl_preflight", "producer", "director", "cinematography", "director_review", "producer_approval", "hitl_final"]) {
+      assert.ok(graph.some((task) => task.id === scene.id + ":" + suffix));
+    }
   }
 });
 
